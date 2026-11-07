@@ -217,7 +217,7 @@ private:
         };
         switch (stage)
         {
-            case Stage::NeedClose: show ("Close " + job.hostName() + " & update", [this] { set (Stage::Closing); host::requestClose (job.pid); }, "Later", [this] { quit(); }); break;
+            case Stage::NeedClose: show ("Close " + job.hostName() + " & update", [this] { askHostToClose(); set (Stage::Closing); }, "Later", [this] { quit(); }); break;
             case Stage::Closing: show ({}, {}, "Cancel", [this] { quit(); }); break;
             case Stage::Done:
                 if (hostExists()) show ("Reopen " + job.hostName(), [this] { host::launch (job.hostExe.toWideCharPointer()); quit(); }, "Close", [this] { quit(); });
@@ -249,6 +249,25 @@ private:
     }
     void fail (const juce::String& why) { error = why; set (Stage::Failed); }
 
+    // Ask the host to close, remembering which of its windows already exist so the save prompt it opens can be spotted.
+    void askHostToClose()
+    {
+        hostWindows = host::windowsOf (job.pid);
+        host::requestClose (job.pid);
+    }
+    // The host's save prompt goes in front of this window (once per prompt, so the user can still click back to us).
+    void bringPromptForward()
+    {
+        for (auto* w : host::windowsOf (job.pid))
+            if (std::find (hostWindows.begin(), hostWindows.end(), w) == hostWindows.end())
+            {
+                hostWindows.push_back (w);
+                host::raiseAbove (w, getWindowHandle());
+                prompt = w;
+                settle = 45; // the host raises its own main window as the prompt activates: re-tuck behind for ~0.75 s
+            }
+    }
+
     void timerCallback() override
     {
         spin = std::fmod (spin + 1.0f / 75.0f, 1000.0f);
@@ -256,7 +275,9 @@ private:
         if (stage == Stage::Closing)
         {
             if (! host::isRunning (job.pid)) { stage = Stage::Install; layoutButtons(); startThread(); }
-            else if (juce::Time::getMillisecondCounter() - closingSince > 20000) { closingSince = juce::Time::getMillisecondCounter(); host::requestClose (job.pid); }
+            else if (juce::Time::getMillisecondCounter() - closingSince > 20000) { closingSince = juce::Time::getMillisecondCounter(); askHostToClose(); }
+            else if (++ticks % 6 == 0) bringPromptForward();
+            else if (settle > 0 && --settle >= 0 && ! host::keepBehind (prompt, getWindowHandle())) settle = 0;
         }
         repaint();
     }
@@ -336,6 +357,9 @@ private:
     juce::String error;
     float spin = 0;
     juce::uint32 closingSince = 0;
+    std::vector<void*> hostWindows; // host windows open before we asked it to close
+    int ticks = 0, settle = 0;
+    void* prompt = nullptr; // the host's save prompt, once spotted
     Btn primary { {}, true }, secondary { {}, false };
     struct HitArea : public juce::Button { HitArea() : juce::Button ("close") {} void paintButton (juce::Graphics&, bool, bool) override {} };
     HitArea closeX; // the cross itself is painted by the view

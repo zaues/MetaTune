@@ -24,7 +24,50 @@ static BOOL CALLBACK closeWindowsOf (HWND w, LPARAM pid)
     return TRUE;
 }
 
-void requestClose (unsigned long pid) { EnumWindows (closeWindowsOf, LPARAM (pid)); }
+void requestClose (unsigned long pid)
+{
+    AllowSetForegroundWindow (DWORD (pid)); // we hold the foreground (the user just clicked us): hand it over
+    EnumWindows (closeWindowsOf, LPARAM (pid));
+}
+
+namespace
+{
+struct WindowQuery { DWORD pid; std::vector<void*>* out; };
+BOOL CALLBACK collectWindowsOf (HWND w, LPARAM p)
+{
+    auto& q = *reinterpret_cast<WindowQuery*> (p);
+    DWORD owner = 0;
+    GetWindowThreadProcessId (w, &owner);
+    if (owner == q.pid && IsWindowVisible (w)) q.out->push_back (w);
+    return TRUE;
+}
+} // namespace
+
+std::vector<void*> windowsOf (unsigned long pid)
+{
+    std::vector<void*> out;
+    WindowQuery q { DWORD (pid), &out };
+    EnumWindows (collectWindowsOf, reinterpret_cast<LPARAM> (&q));
+    return out;
+}
+
+void raiseAbove (void* theirs, void* ours)
+{
+    auto t = static_cast<HWND> (theirs);
+    if (IsIconic (t)) ShowWindow (t, SW_RESTORE);
+    SetForegroundWindow (t);
+    BringWindowToTop (t);
+    if (ours != nullptr)
+        SetWindowPos (static_cast<HWND> (ours), t, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+}
+
+bool keepBehind (void* theirs, void* ours)
+{
+    auto t = static_cast<HWND> (theirs);
+    if (! IsWindow (t) || ! IsWindowVisible (t)) return false;
+    SetWindowPos (static_cast<HWND> (ours), t, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    return true;
+}
 
 int runElevatedAndWait (const std::wstring& exe, const std::wstring& args)
 {
