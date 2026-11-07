@@ -35,6 +35,10 @@ void Orb::setDisplay (const DisplayState& s, bool byp)
     bypassed = byp;
     const float target = byp ? 0.0f : s.presence * (0.3f + 0.7f * juce::jlimit (0.0f, 1.0f, s.level));
     act += (target - act) * 0.15f;
+    // Bolt: on only while voiced, brightness following the raw level so it flickers syllable by syllable.
+    const float boltTarget = (s.voiced && ! byp) ? juce::jlimit (0.35f, 1.0f, 0.35f + 1.3f * s.level) : 0.0f;
+    boltAmt += (boltTarget - boltAmt) * (boltTarget > boltAmt ? 0.65f : 0.3f);
+    if (boltAmt < 0.005f) boltAmt = 0.0f;
     t += 1.0f / 60.0f;
     if (t > 3600.0f) t -= 3600.0f;
     spin += 0.006f + 0.03f * act; // the haze keeps turning; singing speeds it up
@@ -268,14 +272,18 @@ void Orb::paint (juce::Graphics& g)
         g.setOpacity (1.0f);
     }
 
-    // 6. Symbol: crisp white bolt with only a whisper of glow behind it.
+    // 6. Symbol: crisp white bolt, shown only while a voice is detected (flickers with the level).
+    if (const float ba = boltAmt; ba > 0.0f)
     {
-        const auto bp = bolt (juce::Rectangle<float> (19.0f * U, 27.0f * U).withCentre (c));
+        const float sc = 0.85f + 0.15f * ba; // small pop as it lights up
+        const auto bp = bolt (juce::Rectangle<float> (19.0f * U * sc, 27.0f * U * sc).withCentre (c));
+        g.beginTransparencyLayer (ba);
         // Heavy bloom: a wide violet glow, then a tighter white one, then the crisp symbol on top.
         juce::DropShadow (violet.withAlpha (0.55f + 0.3f * a), int (18 * U), {}).drawForPath (g, bp);
         juce::DropShadow (juce::Colours::white.withAlpha (0.45f + 0.2f * a), int (8 * U), {}).drawForPath (g, bp);
         g.setColour (juce::Colours::white);
         g.fillPath (bp);
+        g.endTransparencyLayer();
     }
     if (bypassed)
     {

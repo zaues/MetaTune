@@ -9,7 +9,7 @@
 //  - field: a thin violet ring with a slow pulse;
 //  - haze: a faint spinning particle band around the core;
 //  - core: an organic, wobbling contour (cyan -> white-lavender) around a swirling plum/teal sheen;
-//  - symbol: a crisp white bolt.
+//  - symbol: a crisp white bolt that only shows while a voice is detected, flickering with its level.
 // Voice activity speeds things up, brightens the core and makes its contour ripple harder.
 // The grey ball is an XY pad over the whole stage (Doubler): right = wider, up = more of the doubled voices.
 class Orb : public juce::Component, public juce::SettableTooltipClient
@@ -51,5 +51,6 @@ private:
     float spin = 0;           // continuous rotation of the particle haze
     float t = 0;              // animation clock, seconds (advanced by setDisplay at ~60 Hz)
     float act = 0;            // smoothed voice activity 0..1
+    float boltAmt = 0;        // bolt visibility 0..1: fast attack/release so it flickers with syllables
     juce::Path coreContour (juce::Point<float> c, float radius) const;
 };

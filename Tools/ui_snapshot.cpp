@@ -1,6 +1,6 @@
 // Renders the real editor to PNG for visual review (runs under Wine; no host needed).
 // Feeds the processor a synthetic, slightly sharp harmonic tone so the visualisers show real DSP data.
-// usage: ui_snapshot.exe <out-dir> [scale] [major|bypass]
+// usage: ui_snapshot.exe <out-dir> [scale] [major|bypass|silent]
 #include "../Source/PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -29,6 +29,7 @@ int main (int argc, char** argv)
     std::unique_ptr<juce::AudioProcessorEditor> ed (proc->createEditorAndMakeActive());
     ed->setSize (juce::roundToInt (1082 * scale), juce::roundToInt (856 * scale));
 
+    const double amp = mode == "silent" ? 0.0 : 0.2; // "silent": no input, so voice-driven visuals stay off
     // E4 + 28 cents with vibrato-free harmonics, ~1 s, interleaved with message-loop time so timers run.
     juce::AudioBuffer<float> buf (2, 128);
     juce::MidiBuffer midi;
@@ -40,8 +41,8 @@ int main (int argc, char** argv)
         {
             double s = 0;
             for (int h = 1; h <= 10; ++h) s += std::sin (2 * juce::MathConstants<double>::pi * f * h * double (n) / sr + h) / h;
-            buf.setSample (0, i, float (0.2 * s));
-            buf.setSample (1, i, float (0.2 * s));
+            buf.setSample (0, i, float (amp * s));
+            buf.setSample (1, i, float (amp * s));
         }
         proc->processBlock (buf, midi);
         if (block % 4 == 0)
