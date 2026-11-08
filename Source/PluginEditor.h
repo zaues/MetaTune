@@ -37,6 +37,15 @@ private:
         MetaTuneEditor& owner;
     };
 
+    // Invisible hit zone over the root/scale cell. Uses mouseEnter (delivered reliably by hosts,
+    // unlike continuous mouseMove) so hovering opens the scale picker.
+    struct HoverZone : public juce::Component
+    {
+        std::function<void()> onEnter, onClick;
+        void mouseEnter (const juce::MouseEvent&) override { if (onEnter) onEnter(); }
+        void mouseUp (const juce::MouseEvent& e) override { if (onClick && getLocalBounds().contains (e.getPosition())) onClick(); }
+    };
+
     void timerCallback() override;
     void mouseDown (const juce::MouseEvent&) override; // global listener: a click outside the key picker closes it
     void layout();
@@ -100,6 +109,7 @@ private:
     std::optional<update::Release> pendingUpdate;
     juce::String updateStatus; // shown in the settings menu
     juce::Rectangle<int> rootArea;
+    HoverZone rootHover;
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 
     DisplayState display;

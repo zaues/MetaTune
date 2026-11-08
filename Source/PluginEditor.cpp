@@ -33,8 +33,10 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
                                                             &stabilizerSeg, &groups, &presetBar, &notePill, &majorPill, &minorPill, &chromaticPill,
                                                             &scalePill, &lowLatency, &menuButton, &saveButton, &undoButton, &redoButton,
                                                             &resetButton, &aButton, &copyButton, &bButton, &helpButton, &heatButton,
-                                                            &detectedButton, &bypassButton, &chromaticButton })
+                                                            &detectedButton, &bypassButton, &chromaticButton, &rootHover })
         canvas.addAndMakeVisible (c);
+    rootHover.onEnter = [this] { showRootPicker (true); };
+    rootHover.onClick = [this] { showRootPicker (true); };
     canvas.addChildComponent (rootPicker);
     canvas.addChildComponent (presetPanel);
     canvas.addChildComponent (settingsPanel);
@@ -271,6 +273,7 @@ void MetaTuneEditor::layout()
     keyboard.setBounds (leftW, bottomY, rightX - leftW, kH - bottomY);
     toneSlider.setBounds (8, 650, 116, 24);
     rootArea = { 0, 690, leftW, 132 };
+    rootHover.setBounds (rootArea);
     chromaticButton.setBounds (0, 826, leftW, 30);
     heatButton.setBounds (rightX + 2, 582, 130, 42);
     detectedButton.setBounds (rightX + 2, 626, 130, 62);
@@ -463,11 +466,11 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
         cur.lineTo (6.7f, 11.0f);
         cur.lineTo (12.5f, 11.0f);
         cur.closeSubPath();
-        const auto curBox = juce::Rectangle<float> (24.0f, 32.0f).withCentre ({ area.getCentreX(), area.getCentreY() - 6.0f });
+        const auto curBox = juce::Rectangle<float> (24.0f, 30.0f).withCentre ({ area.getCentreX(), float (e.rootArea.getY()) + 28.0f });
         g.fillPath (cur, cur.getTransformToScaleToFit (curBox, true));
         g.setColour (text.withAlpha (0.9f));
         g.setFont (font (15.0f, true));
-        g.drawFittedText ("Hover to\nset scale", e.rootArea.withTrimmedTop (56).withHeight (48), juce::Justification::centredTop, 2, 1.0f);
+        g.drawFittedText ("Hover to\nset scale", e.rootArea.withTrimmedTop (62).withHeight (52), juce::Justification::centredTop, 2, 1.0f);
     }
     else
     {
@@ -664,13 +667,13 @@ void MetaTuneEditor::showRootPicker (bool show)
         rootPicker.setAlpha (1.0f);
         rootPicker.setVisible (true);
         rootPicker.toFront (false);
-        // Slide in from the left, decelerating into place (no fade).
-        animator.animateComponent (&rootPicker, area, 1.0f, 190, false, 1.0, 0.0);
+        // Slide in from the left with a smooth ease in and out (no fade).
+        animator.animateComponent (&rootPicker, area, 1.0f, 340, false, 0.0, 0.0);
     }
     else
     {
-        // Slide back out to the left.
-        animator.animateComponent (&rootPicker, offLeft, 1.0f, 150, true, 0.0, 1.0);
+        // Slide back out to the left, smoothly.
+        animator.animateComponent (&rootPicker, offLeft, 1.0f, 260, true, 0.0, 0.0);
         rootPicker.setVisible (false);
     }
 }
