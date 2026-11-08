@@ -45,6 +45,7 @@ private:
     juce::ParameterAttachment xAttach, yAttach;
     float xNorm = 0, yNorm = 0;
     bool dragging = false, hoverHandle = false, bypassed = false;
+    juce::Point<float> lockFrom; float lockX = 0, lockY = 0; // Alt-drag: anchor to lock one Doubler axis
     DisplayState state;
     juce::Image sphere, core; // static artwork, rendered once per size
     theme::Anim guide { *this, 0.2f }; // Doubler axis guides fade in on hover

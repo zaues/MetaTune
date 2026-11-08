@@ -31,7 +31,7 @@ void CorrectionEngine::setParams (const Params& np) noexcept
     q.speedMs = std::isfinite (q.speedMs) ? std::clamp (q.speedMs, -3.0, 1000.0) : 20.0;
     q.amount = std::isfinite (q.amount) ? std::clamp (q.amount, 0.0, 1.0) : 1.0;
     q.referenceHz = std::isfinite (q.referenceHz) ? std::clamp (q.referenceHz, 400.0, 480.0) : 440.0;
-    q.sustain = std::isfinite (q.sustain) ? std::clamp (q.sustain, 0.0, 1.0) : 0.0;
+    q.sustain = std::isfinite (q.sustain) ? std::clamp (q.sustain, -1.0, 1.0) : 0.0;
     q.stabilizerMs = std::isfinite (q.stabilizerMs) ? std::clamp (q.stabilizerMs, 0.0, 1000.0) : 0.0;
     const bool coeffs = q.speedMs != p.speedMs || q.hysteresisCents != p.hysteresisCents;
     p = q;
@@ -67,9 +67,10 @@ void CorrectionEngine::onEstimate (const PitchEstimate& e) noexcept
         noteAge = 0;
     }
 
-    // Sustain: shorten the time constant on held notes (only meaningful for positive Speed).
+    // Sustain on held notes (only meaningful for positive Speed): positive shortens the time
+    // constant (held notes retune faster), negative lengthens it (held notes retune slower).
     alpha = baseAlpha;
-    if (p.sustain > 0 && p.speedMs > 0 && noteAge > kSustainOnsetS)
+    if (p.sustain != 0 && p.speedMs > 0 && noteAge > kSustainOnsetS)
     {
         const double ramp = std::min (1.0, (noteAge - kSustainOnsetS) / kSustainRampS);
         alpha = onePoleAlpha (p.speedMs / 1000.0 * (1.0 - 0.97 * p.sustain * ramp), sr);

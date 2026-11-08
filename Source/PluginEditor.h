@@ -35,6 +35,7 @@ private:
     void setRoot (int pc);
     void setParam (const juce::String& id, float value);
     void selectScale (metatune::ScaleType);
+    void selectKeyScale (metatune::ScaleType); // apply a major/minor key then drop into editable Note mode
     void selectNoteMode();
     void updatePicker();        // per-frame: eases the picker's slide toward the pointer/pin state
     void syncRootPickerState(); // push current root/scale into the picker

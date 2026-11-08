@@ -70,7 +70,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     constexpr int v3 = 3; // parameters introduced with the redesigned interface
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamID::sustain, v3 }, "Sustain",
-        NormalisableRange<float> (0.0f, 100.0f, 1.0f), 0.0f,
+        NormalisableRange<float> (-100.0f, 100.0f, 1.0f), 0.0f,
         AudioParameterFloatAttributes().withStringFromValueFunction ([] (float x, int) { return String (x, 0); })));
     layout.add (std::make_unique<AudioParameterChoice> (ParameterID { ParamID::stabilizer, v3 }, "Note Transition", kStabilizerNames, 0));
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamID::toneVolume, v3 }, "Tone Volume",

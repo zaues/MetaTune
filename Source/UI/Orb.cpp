@@ -386,6 +386,7 @@ void Orb::mouseDown (const juce::MouseEvent& e)
     if (e.position.getDistanceFrom (handlePos()) > 20.0f * unit())
         return;
     dragging = true;
+    lockFrom = e.position; lockX = xNorm; lockY = yNorm; // anchor for Alt axis-lock
     xAttach.beginGesture();
     yAttach.beginGesture();
     mouseDrag (e);
@@ -395,8 +396,14 @@ void Orb::mouseDrag (const juce::MouseEvent& e)
 {
     if (! dragging) return;
     const auto t = trackArea();
-    xNorm = juce::jlimit (0.0f, 1.0f, (e.position.x - t.getX()) / t.getWidth());
-    yNorm = juce::jlimit (0.0f, 1.0f, (t.getBottom() - e.position.y) / t.getHeight());
+    float nx = juce::jlimit (0.0f, 1.0f, (e.position.x - t.getX()) / t.getWidth());
+    float ny = juce::jlimit (0.0f, 1.0f, (t.getBottom() - e.position.y) / t.getHeight());
+    if (e.mods.isAltDown()) // lock to the axis with the larger movement from the grab point
+    {
+        if (std::abs (e.position.x - lockFrom.x) >= std::abs (e.position.y - lockFrom.y)) ny = lockY;
+        else nx = lockX;
+    }
+    xNorm = nx; yNorm = ny;
     xAttach.setValueAsPartOfGesture (xParam.convertFrom0to1 (xNorm));
     yAttach.setValueAsPartOfGesture (yParam.convertFrom0to1 (yNorm));
     repaint();
