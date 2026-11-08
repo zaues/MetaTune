@@ -564,6 +564,13 @@ void MetaTuneEditor::timerCallback()
     groups.setSelected (proc.getGroup());
     for (int gi = 0; gi < 4; ++gi)
         groups.setCount (gi, MetaTuneProcessor::groupMemberCount (gi));
+    // If the current preset's file was deleted on disk (in Explorer or elsewhere), stop showing its name.
+    if (++presetCheckTicks >= 45)
+    {
+        presetCheckTicks = 0;
+        if (proc.ui.presetName.isNotEmpty() && ! proc.presetNames().contains (proc.ui.presetName))
+            proc.ui.presetName = {};
+    }
     if (presetBar.name != proc.ui.presetName) { presetBar.name = proc.ui.presetName; presetBar.repaint(); }
     syncModeButtons();
     if (rootPicker.isVisible())

@@ -108,6 +108,7 @@ private:
     double lastVoicedMs = -1e9;
     float latestRms = 0;
     int shownRange = -1;
+    int presetCheckTicks = 0; // throttles the "current preset still exists on disk?" check
     juce::Image brushed; // brushed-metal texture for the knob panel, rendered once
     double openedMs = juce::Time::getMillisecondCounterHiRes();
     float openScale = proc.ui.scale; // saved size at open; the host's first resize must not replace it
