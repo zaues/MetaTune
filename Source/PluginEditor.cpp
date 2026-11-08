@@ -653,21 +653,24 @@ void MetaTuneEditor::showRootPicker (bool show)
 {
     using namespace layout;
     const juce::Rectangle<int> area (0, bottomY, leftW - 1, 826 - bottomY);
+    const juce::Rectangle<int> offLeft = area.translated (-area.getWidth(), 0); // tucked just off the left edge
     auto& animator = juce::Desktop::getInstance().getAnimator();
     if (show == rootPicker.isVisible() && ! animator.isAnimating (&rootPicker))
         return;
     if (show)
     {
         timerCallback(); // sync the picker's selection before it appears
-        rootPicker.setBounds (area);
-        rootPicker.setAlpha (0.0f);
+        rootPicker.setBounds (offLeft);
+        rootPicker.setAlpha (1.0f);
         rootPicker.setVisible (true);
         rootPicker.toFront (false);
-        animator.animateComponent (&rootPicker, area, 1.0f, 160, false, 0.0, 0.0);
+        // Slide in from the left, decelerating into place (no fade).
+        animator.animateComponent (&rootPicker, area, 1.0f, 190, false, 1.0, 0.0);
     }
     else
     {
-        animator.animateComponent (&rootPicker, area, 0.0f, 140, true, 1.0, 1.0);
+        // Slide back out to the left.
+        animator.animateComponent (&rootPicker, offLeft, 1.0f, 150, true, 0.0, 1.0);
         rootPicker.setVisible (false);
     }
 }

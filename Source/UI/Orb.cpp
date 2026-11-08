@@ -136,15 +136,26 @@ void Orb::renderImages()
         const juce::Point<float> k (Rh * 1.1f, Rh * 1.1f);
         const float r0 = kCoreR * U * 0.98f;
         juce::Random rng (5);
-        for (int i = 0; i < 22000; ++i)
+        for (int i = 0; i < 44000; ++i)
         {
             const float a = rng.nextFloat() * juce::MathConstants<float>::twoPi;
-            const float u = std::pow (rng.nextFloat(), 1.8f); // most grains near the contour
+            const float u = std::pow (rng.nextFloat(), 1.9f); // most grains near the contour
             const float r = r0 + (Rh - r0) * u;
-            const float alpha = (0.05f + 0.40f * (1.0f - u)) * (0.3f + 0.7f * rng.nextFloat());
-            const float sz = (0.45f + rng.nextFloat() * 0.6f) * U;
-            g.setColour (coreColourAt (a).interpolatedWith (juce::Colours::white, 0.6f).withAlpha (alpha));
+            const float alpha = (0.05f + 0.46f * (1.0f - u)) * (0.3f + 0.7f * rng.nextFloat());
+            const float sz = (0.40f + rng.nextFloat() * 0.75f) * U;
+            // Brighter, whiter grains hug the contour; the outer veil stays saturated and dim.
+            const float whiteMix = 0.38f + 0.42f * (1.0f - u) * rng.nextFloat();
+            g.setColour (coreColourAt (a).interpolatedWith (juce::Colours::white, whiteMix).withAlpha (alpha));
             g.fillRect (k.x + r * std::sin (a), k.y - r * std::cos (a), sz, sz);
+        }
+        // A few bright embers scattered just inside the contour for sparkle.
+        for (int i = 0; i < 900; ++i)
+        {
+            const float a = rng.nextFloat() * juce::MathConstants<float>::twoPi;
+            const float r = r0 * (0.72f + 0.26f * rng.nextFloat());
+            const float sz = (0.5f + rng.nextFloat() * 1.1f) * U;
+            g.setColour (coreColourAt (a).interpolatedWith (juce::Colours::white, 0.7f).withAlpha (0.10f + 0.45f * rng.nextFloat()));
+            g.fillEllipse (k.x + r * std::sin (a) - sz * 0.5f, k.y - r * std::cos (a) - sz * 0.5f, sz, sz);
         }
     }
 }
@@ -168,10 +179,11 @@ void Orb::paint (juce::Graphics& g)
         g.setOpacity (1.0f);
         // Outer bloom: low and wide.
         // Outer bloom: a wide nebula haze with a long, soft falloff.
-        const float rb = (kSphereR + 50.0f) * U * grow;
+        const float rb = (kSphereR + 64.0f) * U * grow;
         juce::ColourGradient bloom (violet.withAlpha (0.0f), c.x, c.y, violet.withAlpha (0.0f), c.x + rb, c.y, true);
-        bloom.addColour (0.62, juce::Colour (0xff7d6bb8).withAlpha (0.05f + 0.03f * breath + 0.10f * a));
-        bloom.addColour (0.76, juce::Colour (0xff8b7bd0).withAlpha (0.10f + 0.05f * breath + 0.18f * a));
+        bloom.addColour (0.50, juce::Colour (0xff6f5eb0).withAlpha (0.04f + 0.02f * breath + 0.08f * a));
+        bloom.addColour (0.72, juce::Colour (0xff9a86e8).withAlpha (0.12f + 0.06f * breath + 0.20f * a));
+        bloom.addColour (0.86, juce::Colour (0xffb7a4ff).withAlpha (0.07f + 0.04f * breath + 0.14f * a));
         g.setGradientFill (bloom);
         g.fillEllipse (c.x - rb, c.y - rb, 2 * rb, 2 * rb);
         // Reflection: a soft arc drifting over the upper edge, like light sliding across glass.
@@ -204,19 +216,30 @@ void Orb::paint (juce::Graphics& g)
         }
     }
 
-    // 3. Field: thin violet ring with a restrained glow and a gentle pulse.
+    // 3. Field: a bright violet ring with a wide luminous bloom, a crisp core and a glassy highlight.
     {
         const float rm = kFieldR * U * (0.97f + 0.03f * grow);
         const float pulse = 0.5f + 0.5f * std::sin (t * 1.3f + 0.8f);
-        for (int i = 3; i >= 1; --i)
+        const float lum = 0.75f + 0.25f * pulse + 0.40f * a;
+        const juce::Colour glowCol (0xff8f6bff);
+        // Outer-to-inner halo: widening soft strokes stacked for an additive bloom around the ring.
+        for (int i = 5; i >= 1; --i)
         {
-            g.setColour (violet.withAlpha (0.03f + 0.02f * pulse + 0.05f * a));
-            g.drawEllipse (c.x - rm, c.y - rm, 2 * rm, 2 * rm, float (i) * 4.5f * U);
+            const float w = float (i) * 3.6f * U;
+            g.setColour (glowCol.withAlpha ((0.055f + 0.03f * pulse + 0.10f * a) * (0.3f + 0.7f / float (i)) * lum));
+            g.drawEllipse (c.x - rm, c.y - rm, 2 * rm, 2 * rm, w);
         }
-        juce::ColourGradient ring (juce::Colour (0xff9a86ff), c.x - rm * 0.7f, c.y - rm * 0.7f, juce::Colour (0xff4b39a8), c.x + rm * 0.6f, c.y + rm * 0.8f, false);
+        // Crisp ring: a bright gradient core, lit top-left to a deeper violet bottom-right.
+        juce::ColourGradient ring (juce::Colour (0xffeadfff), c.x - rm * 0.7f, c.y - rm * 0.7f,
+                                   juce::Colour (0xff6f4fe6), c.x + rm * 0.7f, c.y + rm * 0.85f, false);
+        ring.addColour (0.5, juce::Colour (0xffc3acff));
         g.setGradientFill (ring);
-        g.setOpacity (0.55f + 0.15f * pulse + 0.3f * a);
-        g.drawEllipse (c.x - rm, c.y - rm, 2 * rm, 2 * rm, 2.2f * U);
+        g.setOpacity (juce::jmin (1.0f, 0.82f + 0.18f * lum));
+        g.drawEllipse (c.x - rm, c.y - rm, 2 * rm, 2 * rm, 2.8f * U);
+        // Thin inner highlight: a glassy sheen on the ring's upper edge.
+        g.setColour (juce::Colours::white.withAlpha (0.28f * lum));
+        const float ri = rm - 1.6f * U;
+        g.drawEllipse (c.x - ri, c.y - ri, 2 * ri, 2 * ri, 0.9f * U);
         g.setOpacity (1.0f);
     }
 
@@ -252,6 +275,11 @@ void Orb::paint (juce::Graphics& g)
             blob (sw + 2.3f, 0.48f, rk * 0.95f, juce::Colour (0x9a1c8c9c));  // teal
             blob (sw + 4.3f, 0.35f, rk * 0.85f, juce::Colour (0x8a4436d6));  // violet
             blob (sw + 1.2f, 0.55f, rk * 0.62f, juce::Colour (0x7aec4899));  // hot-pink light leak
+            blob (sw + 3.4f, 0.72f, rk * 0.70f, juce::Colour (0x886fd0ff));  // cool blue rim light
+            // Bright nebula heart: a soft white-lavender glow blooming from the centre.
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xffeae4ff).withMultipliedAlpha (0.42f * glow), c.x, c.y - rk * 0.08f,
+                                                     juce::Colours::transparentWhite, c.x + rk * 0.9f, c.y, true));
+            g.fillEllipse (c.x - rk, c.y - rk, 2 * rk, 2 * rk);
             // Glass depth: darker toward the rim, a faint sheen high on one side.
             juce::ColourGradient depth (juce::Colours::transparentBlack, c.x, c.y, juce::Colours::black.withAlpha (0.45f), c.x + rk, c.y, true);
             g.setGradientFill (depth);
@@ -259,11 +287,13 @@ void Orb::paint (juce::Graphics& g)
             g.setColour (juce::Colours::white.withAlpha (0.05f));
             g.fillEllipse (c.x - rk * 0.55f, c.y - rk * 0.85f, rk * 0.9f, rk * 0.45f);
         }
-        // Contour: two soft glow passes, then a crisp line shading icy cyan -> white-lavender.
-        g.setColour (lavender.withAlpha (0.07f * glow));
-        g.strokePath (contour, juce::PathStrokeType (10.0f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (juce::Colour (0xffcfc4ff).withAlpha (0.16f * glow));
-        g.strokePath (contour, juce::PathStrokeType (5.0f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        // Contour: three soft glow passes (wide -> tight), then a crisp line shading icy cyan -> white-lavender.
+        g.setColour (lavender.withAlpha (0.055f * glow));
+        g.strokePath (contour, juce::PathStrokeType (16.0f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (lavender.withAlpha (0.10f * glow));
+        g.strokePath (contour, juce::PathStrokeType (9.0f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (juce::Colour (0xffd4caff).withAlpha (0.20f * glow));
+        g.strokePath (contour, juce::PathStrokeType (4.5f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         juce::ColourGradient line (juce::Colour (0xff8fe6ff), c.x - rk, c.y + rk, juce::Colour (0xfff4ecff), c.x + rk, c.y - rk, false);
         line.addColour (0.75, juce::Colour (0xffffd9f2));
         g.setGradientFill (line);
