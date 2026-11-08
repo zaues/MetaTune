@@ -223,16 +223,50 @@ juce::File MetaTuneProcessor::presetFolder()
 
 int MetaTuneProcessor::numFactoryPresets() const noexcept { return int (std::size (kFactory)); }
 
+juce::StringArray MetaTuneProcessor::presetFolders() const
+{
+    juce::StringArray out;
+    for (const auto& d : presetFolder().findChildFiles (juce::File::findDirectories, false))
+        out.add (d.getFileName());
+    out.sortNatural();
+    return out;
+}
+
+static juce::StringArray xmlNamesIn (const juce::File& dir)
+{
+    juce::StringArray names;
+    for (const auto& f : dir.findChildFiles (juce::File::findFiles, false, "*.xml"))
+        names.add (f.getFileNameWithoutExtension());
+    names.sortNatural();
+    return names;
+}
+
+std::vector<MetaTuneProcessor::PresetEntry> MetaTuneProcessor::presetList() const
+{
+    std::vector<PresetEntry> list;
+    for (const auto& f : kFactory) list.push_back ({ f.name, {}, true });
+    const auto root = presetFolder();
+    for (const auto& fld : presetFolders())
+        for (const auto& n : xmlNamesIn (root.getChildFile (fld)))
+            list.push_back ({ n, fld, false });
+    for (const auto& n : xmlNamesIn (root))
+        list.push_back ({ n, {}, false });
+    return list;
+}
+
 juce::StringArray MetaTuneProcessor::presetNames() const
 {
     juce::StringArray names;
-    for (const auto& f : kFactory) names.add (f.name);
-    juce::StringArray user;
-    for (const auto& f : presetFolder().findChildFiles (juce::File::findFiles, false, "*.xml"))
-        user.add (f.getFileNameWithoutExtension());
-    user.sortNatural();
-    names.addArray (user);
+    for (const auto& e : presetList()) names.add (e.name);
     return names;
+}
+
+// Full path of a user preset entry; invalid for factory entries.
+static juce::File presetFile (const MetaTuneProcessor::PresetEntry& e)
+{
+    const auto base = e.folder.isEmpty() ? MetaTuneProcessor::presetFolder()
+                                         : MetaTuneProcessor::presetFolder().getChildFile (e.folder);
+    return base.getChildFile (e.name + ".xml");
 }
 
 void MetaTuneProcessor::applyValues (const juce::StringPairArray& values)
@@ -249,35 +283,71 @@ void MetaTuneProcessor::applyValues (const juce::StringPairArray& values)
 
 void MetaTuneProcessor::loadPreset (int index)
 {
-    const auto names = presetNames();
-    if (! juce::isPositiveAndBelow (index, names.size())) return;
+    const auto list = presetList();
+    if (! juce::isPositiveAndBelow (index, int (list.size()))) return;
+    const auto& e = list[size_t (index)];
     juce::StringPairArray values;
-    if (index < numFactoryPresets())
+    if (e.factory)
     {
         for (const auto& [id, v] : kFactory[index].values) values.set (id, juce::String (v));
     }
     else
     {
-        const auto xml = juce::XmlDocument::parse (presetFolder().getChildFile (names[index] + ".xml"));
+        const auto xml = juce::XmlDocument::parse (presetFile (e));
         if (xml == nullptr) return;
         for (const auto* param : xml->getChildWithTagNameIterator ("PARAM"))
             values.set (param->getStringAttribute ("id"), param->getStringAttribute ("value"));
     }
     undoManager.beginNewTransaction ("Load preset");
     applyValues (values);
-    ui.presetName = names[index];
+    ui.presetName = e.name;
 }
 
-bool MetaTuneProcessor::savePreset (const juce::String& rawName)
+bool MetaTuneProcessor::savePreset (const juce::String& rawName, const juce::String& rawFolder)
 {
     const auto name = juce::File::createLegalFileName (rawName.trim());
     if (name.isEmpty()) return false;
-    const auto folder = presetFolder();
-    if (! folder.createDirectory()) return false;
+    auto dir = presetFolder();
+    if (rawFolder.isNotEmpty()) dir = dir.getChildFile (juce::File::createLegalFileName (rawFolder.trim()));
+    if (! dir.createDirectory()) return false;
     const auto xml = apvts.copyState().createXml();
-    if (xml == nullptr || ! xml->writeTo (folder.getChildFile (name + ".xml"))) return false;
+    if (xml == nullptr || ! xml->writeTo (dir.getChildFile (name + ".xml"))) return false;
     ui.presetName = name;
     return true;
+}
+
+bool MetaTuneProcessor::createFolder (const juce::String& rawName)
+{
+    const auto name = juce::File::createLegalFileName (rawName.trim());
+    if (name.isEmpty()) return false;
+    return presetFolder().getChildFile (name).createDirectory();
+}
+
+void MetaTuneProcessor::deletePreset (int index)
+{
+    const auto list = presetList();
+    if (! juce::isPositiveAndBelow (index, int (list.size()))) return;
+    const auto& e = list[size_t (index)];
+    if (e.factory) return;
+    presetFile (e).moveToTrash();
+    if (ui.presetName == e.name) ui.presetName = {};
+}
+
+void MetaTuneProcessor::deleteFolder (const juce::String& folder)
+{
+    if (folder.isNotEmpty())
+        presetFolder().getChildFile (folder).moveToTrash();
+}
+
+void MetaTuneProcessor::movePreset (int index, const juce::String& toFolder)
+{
+    const auto list = presetList();
+    if (! juce::isPositiveAndBelow (index, int (list.size()))) return;
+    const auto& e = list[size_t (index)];
+    if (e.factory || e.folder == toFolder) return;
+    auto dstDir = toFolder.isEmpty() ? presetFolder() : presetFolder().getChildFile (toFolder);
+    dstDir.createDirectory();
+    presetFile (e).moveFileTo (dstDir.getChildFile (e.name + ".xml"));
 }
 
 // State format v1: <METATUNE version="1"><STATE .../><AB slot=".."><A/><B/></AB><UI .../></METATUNE>.

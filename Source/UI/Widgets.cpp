@@ -601,21 +601,31 @@ void RootPicker::mouseUp (const juce::MouseEvent& e)
         if (scaleRect (i).contains (e.position)) { if (onScale) onScale (i); return; } // stays open; hovering out closes it
 }
 
-void PresetPanel::setItems (const juce::StringArray& names, int numFactory, const juce::String& cur)
+void PresetPanel::setItems (const std::vector<PresetItem>& items, const juce::String& cur)
 {
     rows.clear();
-    rows.push_back ({ Kind::Header, "Factory", -1 });
-    for (int i = 0; i < numFactory && i < names.size(); ++i)
-        rows.push_back ({ Kind::Preset, names[i], i });
-    if (names.size() > numFactory)
+    int idx = 0;
+    rows.push_back ({ Kind::Section, "Factory", {}, -1, false });
+    for (; idx < int (items.size()) && items[size_t (idx)].factory; ++idx)
+        rows.push_back ({ Kind::Preset, items[size_t (idx)].name, {}, idx, true });
+
+    juce::String curFolder;
+    for (; idx < int (items.size()) && items[size_t (idx)].folder.isNotEmpty(); ++idx)
     {
-        rows.push_back ({ Kind::Header, "My presets", -1 });
-        for (int i = numFactory; i < names.size(); ++i)
-            rows.push_back ({ Kind::Preset, names[i], i });
+        const auto& it = items[size_t (idx)];
+        if (it.folder != curFolder) { rows.push_back ({ Kind::Folder, it.folder, it.folder, -1, false }); curFolder = it.folder; }
+        rows.push_back ({ Kind::Preset, it.name, it.folder, idx, false });
     }
-    rows.push_back ({ Kind::Header, {}, -1 });
-    rows.push_back ({ Kind::Save, "Save preset...", -1 });
-    rows.push_back ({ Kind::Folder, "Open presets folder", -1 });
+    bool rootHeader = false;
+    for (; idx < int (items.size()); ++idx)
+    {
+        if (! rootHeader) { rows.push_back ({ Kind::Section, "My presets", {}, -1, false }); rootHeader = true; }
+        rows.push_back ({ Kind::Preset, items[size_t (idx)].name, {}, idx, false });
+    }
+    rows.push_back ({ Kind::Section, {}, {}, -1, false });
+    rows.push_back ({ Kind::NewPreset, "New preset...", {}, -1, false });
+    rows.push_back ({ Kind::NewFolder, "New folder...", {}, -1, false });
+    rows.push_back ({ Kind::OpenFolder, "Open presets folder", {}, -1, false });
     current = cur;
     scroll = juce::jlimit (0.0f, juce::jmax (0.0f, contentHeight() - float (getHeight())), scroll);
     repaint();
@@ -636,16 +646,35 @@ theme::Anim& PresetPanel::rowAnim (int i)
     return *hover[size_t (i)];
 }
 
+juce::Rectangle<float> PresetPanel::rowBounds (int i) const
+{
+    float y = 6.0f - scroll;
+    for (int j = 0; j < i && j < int (rows.size()); ++j) y += rowHeight (rows[size_t (j)]);
+    const float h = juce::isPositiveAndBelow (i, int (rows.size())) ? rowHeight (rows[size_t (i)]) : kRowH;
+    return { 6.0f, y, float (getWidth()) - 12.0f, h };
+}
+
+juce::Rectangle<float> PresetPanel::trashBounds (juce::Rectangle<float> r) const { return { r.getRight() - 23.0f, r.getCentreY() - 7.0f, 15.0f, 15.0f }; }
+juce::Rectangle<float> PresetPanel::plusBounds (juce::Rectangle<float> r) const { return { r.getRight() - 44.0f, r.getCentreY() - 7.0f, 15.0f, 15.0f }; }
+
 int PresetPanel::rowAt (juce::Point<float> p) const
 {
     float y = 6.0f - scroll;
     for (int i = 0; i < int (rows.size()); ++i)
     {
         const float h = rowHeight (rows[size_t (i)]);
-        if (p.y >= y && p.y < y + h) return rows[size_t (i)].kind == Kind::Header ? -1 : i;
+        if (p.y >= y && p.y < y + h) return i;
         y += h;
     }
     return -1;
+}
+
+static void drawTrash (juce::Graphics& g, juce::Rectangle<float> t)
+{
+    g.setColour (juce::Colour (0xffe06a6a));
+    g.drawRect (t.reduced (3.0f, 1.5f).withTrimmedTop (3.0f), 1.2f);     // can body
+    g.drawLine (t.getX() + 1.0f, t.getY() + 3.0f, t.getRight() - 1.0f, t.getY() + 3.0f, 1.3f); // lid
+    g.drawLine (t.getCentreX() - 1.5f, t.getY() + 1.0f, t.getCentreX() + 1.5f, t.getY() + 1.0f, 1.3f); // handle
 }
 
 void PresetPanel::paint (juce::Graphics& g)
@@ -664,58 +693,133 @@ void PresetPanel::paint (juce::Graphics& g)
     g.reduceClipRegion (getLocalBounds());
     const auto mouse = getMouseXYRelative().toFloat();
     const int hot = isMouseOver (true) ? rowAt (mouse) : -1;
-    float y = 6.0f - scroll;
+
     for (int i = 0; i < int (rows.size()); ++i)
     {
         const auto& row = rows[size_t (i)];
-        const float h = rowHeight (row);
-        const auto r = juce::Rectangle<float> (6.0f, y, b.getWidth() - 12.0f, h);
-        y += h;
-        if (row.kind == Kind::Header)
+        const auto r = rowBounds (i);
+        if (r.getBottom() < 0.0f || r.getY() > b.getHeight()) continue;
+
+        if (row.kind == Kind::Section)
         {
-            if (row.text.isEmpty())
+            if (row.text.isEmpty()) { g.setColour (juce::Colours::white.withAlpha (0.08f)); g.fillRect (r.getX() + 6.0f, r.getCentreY(), r.getWidth() - 12.0f, 1.0f); }
+            else { g.setColour (textFaint.brighter (0.2f)); g.setFont (font (11.5f, true)); g.drawText (row.text.toUpperCase(), r.withTrimmedLeft (10.0f), juce::Justification::centredLeft); }
+            if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.5f)); g.drawRoundedRectangle (r.reduced (3.0f, 1.0f), 4.0f, 1.4f); }
+            continue;
+        }
+        if (row.kind == Kind::Folder)
+        {
+            if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.22f)); g.fillRoundedRectangle (r.reduced (2.0f, 1.0f), 4.0f); }
+            g.setColour (textDim.interpolatedWith (text, i == hot ? 1.0f : 0.35f));
+            g.setFont (font (12.0f, true));
+            g.drawText (juce::String::fromUTF8 ("\xF0\x9F\x93\x81  ") + row.text.toUpperCase(), r.withTrimmedLeft (10.0f).withTrimmedRight (50.0f), juce::Justification::centredLeft);
+            if (i == hot && ! dragging)
             {
-                g.setColour (juce::Colours::white.withAlpha (0.08f));
-                g.fillRect (r.getX() + 6.0f, r.getCentreY(), r.getWidth() - 12.0f, 1.0f);
-            }
-            else
-            {
-                g.setColour (textFaint.brighter (0.2f));
-                g.setFont (font (11.5f, true));
-                g.drawText (row.text.toUpperCase(), r.withTrimmedLeft (10.0f), juce::Justification::centredLeft);
+                const auto pb = plusBounds (r);
+                g.setColour (text.withAlpha (0.85f));
+                g.drawLine (pb.getCentreX() - 4.0f, pb.getCentreY(), pb.getCentreX() + 4.0f, pb.getCentreY(), 1.6f);
+                g.drawLine (pb.getCentreX(), pb.getCentreY() - 4.0f, pb.getCentreX(), pb.getCentreY() + 4.0f, 1.6f);
+                drawTrash (g, trashBounds (r));
             }
             continue;
         }
-        auto& a = rowAnim (i);
-        a.setTarget (i == hot ? 1.0f : 0.0f);
-        const bool isCurrent = row.kind == Kind::Preset && row.text == current;
+        if (row.kind == Kind::NewPreset || row.kind == Kind::NewFolder || row.kind == Kind::OpenFolder)
+        {
+            auto& a = rowAnim (i); a.setTarget (i == hot ? 1.0f : 0.0f);
+            if (a.get() > 0.0f) { g.setColour (juce::Colours::white.withAlpha (0.06f * a.get())); g.fillRoundedRectangle (r.reduced (0.0f, 1.5f), 4.0f); }
+            g.setColour (textDim.interpolatedWith (text, juce::jmax (0.55f, a.get())));
+            g.setFont (font (13.0f, true));
+            g.drawText (row.text, r.withTrimmedLeft (22.0f), juce::Justification::centredLeft);
+            continue;
+        }
+
+        auto& a = rowAnim (i); a.setTarget (i == hot ? 1.0f : 0.0f);
+        const bool isCurrent = row.index >= 0 && row.text == current;
         if (a.get() > 0.0f)
         {
             const auto rr = r.reduced (0.0f, 1.5f);
             g.setColour (juce::Colours::white.withAlpha (0.06f * a.get()));
             g.fillRoundedRectangle (rr, 4.0f);
-            g.setColour (juce::Colours::white.withAlpha (0.35f * a.get()));
+            g.setColour (juce::Colours::white.withAlpha (0.3f * a.get()));
             g.drawRoundedRectangle (rr, 4.0f, 1.0f);
         }
-        if (isCurrent)
-        {
-            g.setColour (violet.brighter (0.3f));
-            g.fillEllipse (r.getX() + 9.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f);
-        }
+        if (isCurrent) { g.setColour (violet.brighter (0.3f)); g.fillEllipse (r.getX() + 9.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f); }
         g.setColour (isCurrent ? text : textDim.interpolatedWith (text, a.get()));
-        g.setFont (row.kind == Kind::Preset ? font (13.5f, isCurrent) : font (13.0f, true));
-        g.drawText (row.text, r.withTrimmedLeft (22.0f), juce::Justification::centredLeft);
+        g.setFont (font (13.5f, isCurrent));
+        g.drawText (row.text, r.withTrimmedLeft (22.0f).withTrimmedRight (26.0f), juce::Justification::centredLeft);
+        if (i == hot && ! row.factory && ! dragging) drawTrash (g, trashBounds (r));
+    }
+
+    if (dragging && dragIndex >= 0)
+    {
+        const auto box = juce::Rectangle<float> (150.0f, 22.0f).withCentre (mouse.translated (0.0f, -14.0f));
+        g.setColour (bg3.withAlpha (0.95f));
+        g.fillRoundedRectangle (box, 5.0f);
+        g.setColour (violet.withAlpha (0.6f));
+        g.drawRoundedRectangle (box, 5.0f, 1.0f);
+        juce::String nm;
+        for (const auto& rr : rows) if (rr.index == dragIndex) nm = rr.text;
+        g.setColour (text);
+        g.setFont (font (12.5f, true));
+        g.drawText (nm, box, juce::Justification::centred);
+    }
+}
+
+void PresetPanel::mouseDown (const juce::MouseEvent& e)
+{
+    downPos = e.position; dragging = false; dragIndex = -1; dropRow = -1;
+    const int i = rowAt (e.position);
+    if (i >= 0 && rows[size_t (i)].kind == Kind::Preset && ! rows[size_t (i)].factory
+        && ! trashBounds (rowBounds (i)).contains (e.position))
+        dragIndex = rows[size_t (i)].index;
+}
+
+void PresetPanel::mouseDrag (const juce::MouseEvent& e)
+{
+    if (dragIndex < 0) return;
+    if (! dragging && e.position.getDistanceFrom (downPos) > 5.0f) dragging = true;
+    if (dragging)
+    {
+        const int i = rowAt (e.position);
+        const bool isTarget = i >= 0 && (rows[size_t (i)].kind == Kind::Folder
+                                         || (rows[size_t (i)].kind == Kind::Section && rows[size_t (i)].text == "My presets"));
+        dropRow = isTarget ? i : -1;
+        repaint();
     }
 }
 
 void PresetPanel::mouseUp (const juce::MouseEvent& e)
 {
+    if (dragging)
+    {
+        if (dragIndex >= 0 && dropRow >= 0 && onMove)
+        {
+            const auto& dr = rows[size_t (dropRow)];
+            onMove (dragIndex, dr.kind == Kind::Folder ? dr.folder : juce::String());
+        }
+        dragging = false; dragIndex = -1; dropRow = -1; repaint();
+        return;
+    }
+    dragIndex = -1;
     const int i = rowAt (e.position);
     if (i < 0) return;
     const auto& row = rows[size_t (i)];
-    if (row.kind == Kind::Preset && onLoad) onLoad (row.index);
-    if (row.kind == Kind::Save && onSave) onSave();
-    if (row.kind == Kind::Folder && onOpenFolder) onOpenFolder();
+    const auto r = rowBounds (i);
+    switch (row.kind)
+    {
+        case Kind::Preset:
+            if (! row.factory && trashBounds (r).contains (e.position)) { if (onDelete) onDelete (row.index); }
+            else if (onLoad) onLoad (row.index);
+            break;
+        case Kind::Folder:
+            if (plusBounds (r).contains (e.position)) { if (onSaveToFolder) onSaveToFolder (row.folder); }
+            else if (trashBounds (r).contains (e.position)) { if (onDeleteFolder) onDeleteFolder (row.folder); }
+            break;
+        case Kind::NewPreset:  if (onNewPreset) onNewPreset(); break;
+        case Kind::NewFolder:  if (onNewFolder) onNewFolder(); break;
+        case Kind::OpenFolder: if (onOpenFolder) onOpenFolder(); break;
+        default: break;
+    }
 }
 
 void PresetPanel::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& w)

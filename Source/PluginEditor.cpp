@@ -55,12 +55,19 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     saveCard.setBounds (0, 0, kW, kH);
     saveCard.onCancel = [this] { saveCard.setVisible (false); };
     saveCard.onSave = [this] (const juce::String& n) {
-        if (n.trim().isEmpty()) { saveCard.open ({}, "Type a name first"); return; }
-        if (proc.savePreset (n)) saveCard.setVisible (false);
-        else saveCard.open ({}, "Could not save the preset");
+        const bool folder = pendingSave == PendingSave::Folder;
+        if (n.trim().isEmpty()) { saveCard.open ({}, folder ? "Type a folder name" : "Type a name first"); return; }
+        const bool ok = folder ? proc.createFolder (n) : proc.savePreset (n, pendingFolder);
+        if (ok) saveCard.setVisible (false);
+        else saveCard.open ({}, folder ? "Could not create the folder" : "Could not save the preset");
     };
     presetPanel.onLoad = [this] (int i) { proc.loadPreset (i); showPresetPanel (false); };
-    presetPanel.onSave = [this] { showPresetPanel (false); savePresetDialog(); };
+    presetPanel.onNewPreset = [this] { showPresetPanel (false); pendingSave = PendingSave::Preset; pendingFolder = {}; saveCard.open (proc.ui.presetName); };
+    presetPanel.onSaveToFolder = [this] (const juce::String& f) { showPresetPanel (false); pendingSave = PendingSave::Preset; pendingFolder = f; saveCard.open (proc.ui.presetName); };
+    presetPanel.onNewFolder = [this] { showPresetPanel (false); pendingSave = PendingSave::Folder; pendingFolder = {}; saveCard.open ({}); };
+    presetPanel.onDelete = [this] (int i) { proc.deletePreset (i); refreshPresetPanel(); };
+    presetPanel.onDeleteFolder = [this] (const juce::String& f) { proc.deleteFolder (f); refreshPresetPanel(); };
+    presetPanel.onMove = [this] (int i, const juce::String& f) { proc.movePreset (i, f); refreshPresetPanel(); };
     presetPanel.onOpenFolder = [this] {
         showPresetPanel (false);
         const auto folder = MetaTuneProcessor::presetFolder();
@@ -821,7 +828,7 @@ void MetaTuneEditor::showPresetPanel (bool show)
     auto& animator = juce::Desktop::getInstance().getAnimator();
     if (show == presetPanel.isVisible() && ! animator.isAnimating (&presetPanel))
         return;
-    presetPanel.setItems (proc.presetNames(), proc.numFactoryPresets(), proc.ui.presetName);
+    refreshPresetPanel();
     const int h = juce::jmin (presetPanel.preferredHeight(), layout::rowY - layout::headerH - 12);
     const juce::Rectangle<int> open (113, layout::headerH + 2, 287, h), tucked = open.translated (0, -12);
     if (show)
@@ -851,7 +858,17 @@ void MetaTuneEditor::stepPreset (int delta)
 void MetaTuneEditor::savePresetDialog()
 {
     showPresetPanel (false);
+    pendingSave = PendingSave::Preset;
+    pendingFolder = {};
     saveCard.open (proc.ui.presetName);
+}
+
+void MetaTuneEditor::refreshPresetPanel()
+{
+    std::vector<PresetItem> items;
+    for (const auto& e : proc.presetList())
+        items.push_back ({ e.name, e.folder, e.factory });
+    presetPanel.setItems (items, proc.ui.presetName);
 }
 
 void MetaTuneEditor::setScale (float s)

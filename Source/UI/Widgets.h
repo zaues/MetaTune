@@ -199,34 +199,51 @@ private:
     theme::Anim& cellAnim (int i);
 };
 
-// Preset list that drops down from the header preset box, inside the plugin window.
-// Factory presets, the user's presets, then Save / Open folder. Wheel scrolls when it overflows.
+// One preset as the panel sees it (folder "" = root / factory).
+struct PresetItem { juce::String name, folder; bool factory = false; };
+
+// Preset list that drops down from the header preset box, inside the plugin window. Factory presets,
+// then user sub-folders (each with a + to save-into and a trash to delete), then root "My presets",
+// then New preset / New folder / Open folder. User presets have a hover trash button and can be
+// dragged onto a folder (or "My presets") to move them. Wheel scrolls when it overflows.
 class PresetPanel : public juce::Component
 {
 public:
-    std::function<void (int index)> onLoad;
-    std::function<void()> onSave, onOpenFolder, onMouseLeave;
+    std::function<void (int index)> onLoad;                               // index into the flat preset list
+    std::function<void()> onNewPreset, onNewFolder, onOpenFolder, onMouseLeave;
+    std::function<void (const juce::String& folder)> onSaveToFolder;      // save current preset into a folder
+    std::function<void (int index)> onDelete;                            // trash a user preset
+    std::function<void (const juce::String& folder)> onDeleteFolder;     // trash a folder
+    std::function<void (int index, const juce::String& folder)> onMove;  // move a preset to a folder ("" = root)
 
-    void setItems (const juce::StringArray& names, int numFactory, const juce::String& current);
+    void setItems (const std::vector<PresetItem>& items, const juce::String& current);
     int preferredHeight() const;
     void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override { repaint(); }
-    void mouseExit (const juce::MouseEvent&) override { repaint(); if (onMouseLeave) onMouseLeave(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); if (! dragging && onMouseLeave) onMouseLeave(); }
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
 private:
-    enum class Kind { Header, Preset, Save, Folder };
-    struct Row { Kind kind; juce::String text; int index; };
+    enum class Kind { Section, Folder, Preset, NewPreset, NewFolder, OpenFolder };
+    struct Row { Kind kind; juce::String text; juce::String folder; int index = -1; bool factory = false; };
     static constexpr float kRowH = 26.0f, kHeaderH = 24.0f;
-    float rowHeight (const Row& r) const { return r.kind == Kind::Header ? kHeaderH : kRowH; }
+    float rowHeight (const Row& r) const { return (r.kind == Kind::Section || r.kind == Kind::Folder) ? kHeaderH : kRowH; }
     float contentHeight() const;
     int rowAt (juce::Point<float>) const;
+    juce::Rectangle<float> rowBounds (int i) const;
+    juce::Rectangle<float> trashBounds (juce::Rectangle<float> row) const;
+    juce::Rectangle<float> plusBounds (juce::Rectangle<float> row) const;
     theme::Anim& rowAnim (int i);
 
     std::vector<Row> rows;
     juce::String current;
     float scroll = 0;
+    int dragIndex = -1, dropRow = -1; // dragIndex = preset being dragged; dropRow = folder/section row under cursor
+    bool dragging = false;
+    juce::Point<float> downPos;
     std::vector<std::unique_ptr<theme::Anim>> hover;
 };
 

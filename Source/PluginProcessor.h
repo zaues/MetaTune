@@ -43,13 +43,21 @@ public:
     void switchAB();      // store the current settings in this slot, recall the other one
     void copyToOtherAB(); // overwrite the other slot with the current settings
 
-    // Presets: built-in ones first, then the user's files in presetFolder(). Loading a preset never
-    // changes the key/scale or bypass, so a vocal chain can be swapped without re-entering the key.
+    // Presets: built-in ones first, then the user's files in presetFolder() and its sub-folders.
+    // Loading a preset never changes the key/scale or bypass (unless Keep My Scale is off).
+    struct PresetEntry { juce::String name, folder; bool factory = false; }; // folder "" = root / factory
     static juce::File presetFolder();
-    juce::StringArray presetNames() const;
+    std::vector<PresetEntry> presetList() const;      // the ordered entries (indices used everywhere below)
+    juce::StringArray presetNames() const;            // just the display names, same order as presetList()
+    juce::StringArray presetFolders() const;          // user sub-folder names, sorted
     int numFactoryPresets() const noexcept;
     void loadPreset (int index);
-    bool savePreset (const juce::String& name);
+    bool savePreset (const juce::String& name) { return savePreset (name, {}); }
+    bool savePreset (const juce::String& name, const juce::String& folder);
+    bool createFolder (const juce::String& name);
+    void deletePreset (int index);                    // user presets only; moves the file to the trash
+    void deleteFolder (const juce::String& folder);   // trashes the folder and its presets
+    void movePreset (int index, const juce::String& toFolder); // "" = move to root
 
     // Groups: copies of the plugin in the same group (0-3) share every setting except Bypass.
     // Message thread only. Joining adopts the group's current settings; joining the same group again leaves it.
