@@ -17,9 +17,6 @@ class Orb : public juce::Component, public juce::SettableTooltipClient
 public:
     Orb (juce::RangedAudioParameter& xParam, juce::RangedAudioParameter& yParam, juce::String xName, juce::String yName, juce::UndoManager*);
 
-    // Optional: dragging the orb body also drives Speed (inner) and Amount (outer sphere), per the guide.
-    void setSpeedAmount (juce::RangedAudioParameter* speed, juce::RangedAudioParameter* amount) { speedP = speed; amountP = amount; }
-
     void setDisplay (const DisplayState& s, bool bypassed);
     void paint (juce::Graphics&) override;
     void resized() override { sphere = {}; core = {}; }
@@ -49,11 +46,6 @@ private:
     float xNorm = 0, yNorm = 0;
     bool dragging = false, hoverHandle = false, bypassed = false;
     juce::Point<float> lockFrom; float lockX = 0, lockY = 0; // Alt-drag: anchor to lock one Doubler axis
-    // Orb-body drag -> Speed/Amount (the grey dot still drives the Doubler).
-    juce::RangedAudioParameter* speedP = nullptr;
-    juce::RangedAudioParameter* amountP = nullptr;
-    enum class Drag { None, Doubler, Speed, Amount } dragMode = Drag::None;
-    float dragStartNorm = 0; juce::Point<float> dragStart;
     DisplayState state;
     juce::Image sphere, core; // static artwork, rendered once per size
     theme::Anim guide { *this, 0.2f }; // Doubler axis guides fade in on hover
