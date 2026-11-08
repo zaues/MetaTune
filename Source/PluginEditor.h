@@ -43,6 +43,8 @@ private:
     juce::String scaleDisplayName() const;
     void showPresetPanel (bool show);
     void refreshPresetPanel();
+    void showGroupBrowser (bool show);
+    void refreshGroupBrowser();
     void showSettingsPanel (bool show);
     void stepPreset (int delta);
     void savePresetDialog();
@@ -70,6 +72,7 @@ private:
     PresetBar presetBar;
     RootPicker rootPicker;
     PresetPanel presetPanel;
+    GroupBrowser groupBrowser;
     SettingsPanel settingsPanel;
     SavePresetCard saveCard;
 
@@ -96,8 +99,9 @@ private:
     bool pickerPinned = false; // true = picker opened by clicking "Scale"; stays until a click elsewhere
     float pickerSlide = 0.0f;  // 0 = tucked off the left edge / hidden, 1 = fully in; eased each frame
     int toneChordMode = 0;     // 0 single, 1 major, 2 minor: what the tone generator plays on a key press
-    enum class PendingSave { Preset, Folder } pendingSave = PendingSave::Preset;
+    enum class PendingSave { Preset, Folder, GroupName } pendingSave = PendingSave::Preset;
     juce::String pendingFolder; // target folder for the next preset save ("" = root)
+    int pendingGroup = 0;       // group being renamed via the save card
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 
     DisplayState display;

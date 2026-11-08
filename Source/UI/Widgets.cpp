@@ -356,7 +356,8 @@ void GroupTabs::paint (juce::Graphics& g)
 void GroupTabs::mouseDown (const juce::MouseEvent& e)
 {
     const int i = indexAt (e.position.y);
-    if (i >= 0 && onSelect) onSelect (i);
+    if (i >= 0) { if (onSelect) onSelect (i); }
+    else if (onBrowse) onBrowse(); // the grid icon at the top opens the Group Browser
 }
 
 void GroupTabs::mouseMove (const juce::MouseEvent& e)
@@ -827,6 +828,155 @@ void PresetPanel::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWhee
     const float maxScroll = juce::jmax (0.0f, contentHeight() - float (getHeight()));
     scroll = juce::jlimit (0.0f, maxScroll, scroll - w.deltaY * 120.0f);
     repaint();
+}
+
+void GroupBrowser::setData (const juce::StringArray& groupNames, const std::vector<GroupInstanceRow>& instances)
+{
+    rows.clear();
+    for (int g = 0; g < 4; ++g)
+    {
+        rows.push_back ({ Kind::GroupHeader, g, 0, g < groupNames.size() ? groupNames[g] : "Group " + juce::String (g + 1), false });
+        int count = 0;
+        for (const auto& it : instances)
+            if (it.group == g) { rows.push_back ({ Kind::Instance, g, it.id, it.label, it.self }); ++count; }
+        if (count == 0) rows.push_back ({ Kind::Empty, g, 0, {}, false });
+    }
+    rows.push_back ({ Kind::GroupHeader, -1, 0, "Ungrouped", false });
+    for (const auto& it : instances)
+        if (it.group < 0) rows.push_back ({ Kind::Instance, -1, it.id, it.label, it.self });
+    repaint();
+}
+
+float GroupBrowser::contentHeight() const
+{
+    float h = 8.0f;
+    for (const auto& r : rows) h += rowHeight (r);
+    return h + 8.0f;
+}
+int GroupBrowser::preferredHeight() const { return int (std::ceil (contentHeight())); }
+
+theme::Anim& GroupBrowser::rowAnim (int i)
+{
+    while (int (hover.size()) <= i) hover.push_back (std::make_unique<theme::Anim> (*this, 0.3f));
+    return *hover[size_t (i)];
+}
+
+juce::Rectangle<float> GroupBrowser::rowBounds (int i) const
+{
+    float y = 8.0f;
+    for (int j = 0; j < i && j < int (rows.size()); ++j) y += rowHeight (rows[size_t (j)]);
+    const float h = juce::isPositiveAndBelow (i, int (rows.size())) ? rowHeight (rows[size_t (i)]) : kRowH;
+    return { 8.0f, y, float (getWidth()) - 16.0f, h };
+}
+
+int GroupBrowser::rowAt (juce::Point<float> p) const
+{
+    float y = 8.0f;
+    for (int i = 0; i < int (rows.size()); ++i)
+    {
+        const float h = rowHeight (rows[size_t (i)]);
+        if (p.y >= y && p.y < y + h) return i;
+        y += h;
+    }
+    return -1;
+}
+
+void GroupBrowser::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto b = getLocalBounds().toFloat();
+    juce::Path bg;
+    bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), 8.0f, 8.0f);
+    juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 18, { 0, 4 }).drawForPath (g, bg);
+    g.setColour (juce::Colour (0xff1c1c1e));
+    g.fillPath (bg);
+    g.setColour (juce::Colours::white.withAlpha (0.07f));
+    g.strokePath (bg, juce::PathStrokeType (1.0f));
+
+    juce::Graphics::ScopedSaveState ss (g);
+    g.reduceClipRegion (getLocalBounds());
+    const auto mouse = getMouseXYRelative().toFloat();
+    const int hot = isMouseOver (true) ? rowAt (mouse) : -1;
+
+    for (int i = 0; i < int (rows.size()); ++i)
+    {
+        const auto& row = rows[size_t (i)];
+        const auto r = rowBounds (i);
+        if (row.kind == Kind::GroupHeader)
+        {
+            if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.22f)); g.fillRoundedRectangle (r.reduced (1.0f), 4.0f); }
+            g.setColour (row.group < 0 ? textFaint.brighter (0.2f) : (i == hot && ! dragging ? violet.brighter (0.4f) : text));
+            g.setFont (font (12.5f, true));
+            g.drawText (row.text.toUpperCase(), r.withTrimmedLeft (10.0f).withTrimmedRight (54.0f), juce::Justification::centredLeft);
+            if (row.group >= 0 && i == hot && ! dragging)
+            {
+                g.setColour (textDim);
+                g.setFont (font (10.5f, true));
+                g.drawText ("rename", r.withTrimmedRight (10.0f), juce::Justification::centredRight);
+            }
+            continue;
+        }
+        if (row.kind == Kind::Empty)
+        {
+            g.setColour (textFaint.withAlpha (0.5f));
+            g.setFont (font (11.5f, false));
+            g.drawText (juce::String::fromUTF8 ("\xE2\x80\x94 empty \xE2\x80\x94"), r.withTrimmedLeft (26.0f), juce::Justification::centredLeft);
+            continue;
+        }
+        auto& a = rowAnim (i); a.setTarget (i == hot ? 1.0f : 0.0f);
+        if (a.get() > 0.0f) { g.setColour (juce::Colours::white.withAlpha (0.06f * a.get())); g.fillRoundedRectangle (r.reduced (0.0f, 1.5f), 4.0f); }
+        if (row.self) { g.setColour (violet.brighter (0.3f)); g.fillEllipse (r.getX() + 12.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f); }
+        g.setColour (textDim.interpolatedWith (text, juce::jmax (row.self ? 0.9f : 0.5f, a.get())));
+        g.setFont (font (13.0f, row.self));
+        g.drawText (row.text + (row.self ? juce::String ("  (this)") : juce::String()), r.withTrimmedLeft (26.0f), juce::Justification::centredLeft);
+    }
+
+    if (dragging && dragId >= 0)
+    {
+        juce::String nm;
+        for (const auto& rr : rows) if (rr.kind == Kind::Instance && rr.id == dragId) nm = rr.text;
+        const auto box = juce::Rectangle<float> (150.0f, 22.0f).withCentre (mouse.translated (0.0f, -14.0f));
+        g.setColour (bg3.withAlpha (0.95f));
+        g.fillRoundedRectangle (box, 5.0f);
+        g.setColour (violet.withAlpha (0.6f));
+        g.drawRoundedRectangle (box, 5.0f, 1.0f);
+        g.setColour (text); g.setFont (font (12.5f, true));
+        g.drawText (nm, box, juce::Justification::centred);
+    }
+}
+
+void GroupBrowser::mouseDown (const juce::MouseEvent& e)
+{
+    downPos = e.position; dragging = false; dragId = -1; dropRow = -1;
+    const int i = rowAt (e.position);
+    if (i >= 0 && rows[size_t (i)].kind == Kind::Instance) dragId = rows[size_t (i)].id;
+}
+
+void GroupBrowser::mouseDrag (const juce::MouseEvent& e)
+{
+    if (dragId < 0) return;
+    if (! dragging && e.position.getDistanceFrom (downPos) > 5.0f) dragging = true;
+    if (dragging)
+    {
+        const int i = rowAt (e.position);
+        dropRow = (i >= 0 && rows[size_t (i)].kind == Kind::GroupHeader) ? i : -1;
+        repaint();
+    }
+}
+
+void GroupBrowser::mouseUp (const juce::MouseEvent& e)
+{
+    if (dragging)
+    {
+        if (dragId >= 0 && dropRow >= 0 && onAssign) onAssign (dragId, rows[size_t (dropRow)].group);
+        dragging = false; dragId = -1; dropRow = -1; repaint();
+        return;
+    }
+    dragId = -1;
+    const int i = rowAt (e.position);
+    if (i < 0) return;
+    const auto& row = rows[size_t (i)];
+    if (row.kind == Kind::GroupHeader && row.group >= 0 && onRename) onRename (row.group);
 }
 
 SavePresetCard::SavePresetCard()

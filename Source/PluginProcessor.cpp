@@ -9,8 +9,10 @@ struct GroupHub
 {
     juce::CriticalSection lock;
     juce::Array<MetaTuneProcessor*> members;
+    juce::String names[4];                 // user-chosen group names (empty = default)
     static GroupHub& get() { static GroupHub hub; return hub; }
 };
+static std::atomic<int> sNextInstanceId { 1 };
 } // namespace
 
 
@@ -38,6 +40,7 @@ MetaTuneProcessor::MetaTuneProcessor()
     chain.setTelemetryQueue (&telemetry);
     {
         const juce::ScopedLock sl (GroupHub::get().lock);
+        instanceId = sNextInstanceId++;
         GroupHub::get().members.add (this);
     }
     startTimerHz (20);
@@ -102,6 +105,48 @@ void MetaTuneProcessor::syncGroup()
     for (auto* m : GroupHub::get().members)
         if (m != this && m->ui.group == ui.group)
             m->receiveGroupValues (now);
+}
+
+void MetaTuneProcessor::setGroup (int group)
+{
+    const juce::ScopedLock sl (GroupHub::get().lock);
+    ui.group = juce::jlimit (-1, 3, group);
+    if (ui.group < 0) { groupSynced = linkedValues(); return; }
+    for (auto* m : GroupHub::get().members)
+        if (m != this && m->ui.group == ui.group) { receiveGroupValues (m->linkedValues()); return; }
+    groupSynced = linkedValues();
+}
+
+std::vector<MetaTuneProcessor::GroupInstanceInfo> MetaTuneProcessor::groupInstances() const
+{
+    const juce::ScopedLock sl (GroupHub::get().lock);
+    std::vector<GroupInstanceInfo> out;
+    for (auto* m : GroupHub::get().members)
+        out.push_back ({ m->instanceId, m->ui.group, m->ui.presetName });
+    std::sort (out.begin(), out.end(), [] (const GroupInstanceInfo& a, const GroupInstanceInfo& b) { return a.id < b.id; });
+    return out;
+}
+
+void MetaTuneProcessor::setInstanceGroup (int id, int group)
+{
+    const juce::ScopedLock sl (GroupHub::get().lock);
+    for (auto* m : GroupHub::get().members)
+        if (m->instanceId == id) { m->setGroup (group); return; }
+}
+
+juce::String MetaTuneProcessor::groupName (int group)
+{
+    if (! juce::isPositiveAndBelow (group, 4)) return {};
+    const juce::ScopedLock sl (GroupHub::get().lock);
+    const auto n = GroupHub::get().names[group];
+    return n.isNotEmpty() ? n : "Group " + juce::String (group + 1);
+}
+
+void MetaTuneProcessor::setGroupName (int group, const juce::String& name)
+{
+    if (! juce::isPositiveAndBelow (group, 4)) return;
+    const juce::ScopedLock sl (GroupHub::get().lock);
+    GroupHub::get().names[group] = name;
 }
 
 void MetaTuneProcessor::prepareToPlay (double sr, int)

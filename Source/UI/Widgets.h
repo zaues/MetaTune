@@ -126,6 +126,7 @@ class GroupTabs : public juce::Component, public juce::SettableTooltipClient
 {
 public:
     std::function<void (int)> onSelect;
+    std::function<void()> onBrowse; // the grid icon opens the Group Browser
     void setSelected (int g) { if (g != selected) { selected = g; repaint(); } }
     void setCount (int g, int n) { if (counts[g] != n) { counts[g] = n; repaint(); } }
     void paint (juce::Graphics&) override;
@@ -243,6 +244,44 @@ private:
     float scroll = 0;
     int dragIndex = -1, dropRow = -1; // dragIndex = preset being dragged; dropRow = folder/section row under cursor
     bool dragging = false;
+    juce::Point<float> downPos;
+    std::vector<std::unique_ptr<theme::Anim>> hover;
+};
+
+// One live instance as the group browser sees it.
+struct GroupInstanceRow { int id = 0, group = -1; juce::String label; bool self = false; };
+
+// Group Browser: lists the four groups (named, click to rename) with their member instances, plus an
+// "Ungrouped" section. Drag an instance onto a group (or Ungrouped) to move it. Drops from the header
+// preset bar's "Groups" affordance.
+class GroupBrowser : public juce::Component
+{
+public:
+    std::function<void (int id, int group)> onAssign; // group -1 = ungroup
+    std::function<void (int group)> onRename;
+    std::function<void()> onMouseLeave;
+
+    void setData (const juce::StringArray& groupNames, const std::vector<GroupInstanceRow>& instances);
+    int preferredHeight() const;
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); if (! dragging && onMouseLeave) onMouseLeave(); }
+
+private:
+    enum class Kind { GroupHeader, Instance, Empty };
+    struct Row { Kind kind; int group; int id; juce::String text; bool self; };
+    static constexpr float kRowH = 26.0f, kHeaderH = 26.0f;
+    float rowHeight (const Row& r) const { return r.kind == Kind::GroupHeader ? kHeaderH : kRowH; }
+    float contentHeight() const;
+    juce::Rectangle<float> rowBounds (int i) const;
+    int rowAt (juce::Point<float>) const;
+    theme::Anim& rowAnim (int i);
+
+    std::vector<Row> rows;
+    int dragId = -1, dropRow = -1; bool dragging = false;
     juce::Point<float> downPos;
     std::vector<std::unique_ptr<theme::Anim>> hover;
 };

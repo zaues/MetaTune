@@ -21,7 +21,7 @@ static juce::Rectangle<int> around (juce::Point<float> c, float r) { return juce
 MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     : AudioProcessorEditor (p), proc (p), state (p.apvts),
       speedKnob ("Speed", formatSpeed, { -135.0f, 60.0f, true, 3, layout::speedBand, "ms" }),
-      sustainKnob ("Sustain", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -135.0f, 135.0f, false, 3, -1.0f, "%" }),
+      sustainKnob ("Sustain", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -135.0f, 135.0f, false, 4, -1.0f, "%" }),
       amountKnob ("Amount", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -140.0f, 62.0f, true, 3, -1.0f, "%" }),
       orb (*state.getParameter (ParamID::doublerWidth), *state.getParameter (ParamID::doublerMix), "Doubler\nWidth", "Doubler\nDry / Wet", &p.undoManager),
       stabilizerSeg (*state.getParameter (ParamID::stabilizer), kStabilizerNames, &p.undoManager)
@@ -37,6 +37,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
         canvas.addAndMakeVisible (c);
     canvas.addChildComponent (rootPicker);
     canvas.addChildComponent (presetPanel);
+    canvas.addChildComponent (groupBrowser);
     canvas.addChildComponent (settingsPanel);
     settingsPanel.onPick = [this] (int id) {
         showSettingsPanel (false);
@@ -55,6 +56,12 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     saveCard.setBounds (0, 0, kW, kH);
     saveCard.onCancel = [this] { saveCard.setVisible (false); };
     saveCard.onSave = [this] (const juce::String& n) {
+        if (pendingSave == PendingSave::GroupName)
+        {
+            MetaTuneProcessor::setGroupName (pendingGroup, n.trim());
+            saveCard.setVisible (false);
+            return;
+        }
         const bool folder = pendingSave == PendingSave::Folder;
         if (n.trim().isEmpty()) { saveCard.open ({}, folder ? "Type a folder name" : "Type a name first"); return; }
         const bool ok = folder ? proc.createFolder (n) : proc.savePreset (n, pendingFolder);
@@ -143,6 +150,13 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
 
     groups.setSelected (proc.ui.group);
     groups.onSelect = [this] (int g) { proc.joinGroup (g); groups.setSelected (proc.getGroup()); };
+    groups.onBrowse = [this] { showGroupBrowser (! groupBrowser.isVisible()); };
+    groupBrowser.onAssign = [this] (int id, int grp) { MetaTuneProcessor::setInstanceGroup (id, grp); refreshGroupBrowser(); };
+    groupBrowser.onRename = [this] (int grp) { showGroupBrowser (false); pendingSave = PendingSave::GroupName; pendingGroup = grp; saveCard.open (MetaTuneProcessor::groupName (grp)); };
+    groupBrowser.onMouseLeave = [this] {
+        if (! groupBrowser.getLocalBounds().contains (groupBrowser.getMouseXYRelative()))
+            showGroupBrowser (false);
+    };
 
     for (auto* b : { &helpButton, &heatButton, &detectedButton })
         b->setClickingTogglesState (true);
@@ -210,6 +224,7 @@ MetaTuneEditor::~MetaTuneEditor()
     auto& animator = juce::Desktop::getInstance().getAnimator();
     animator.cancelAnimation (&rootPicker, false);
     animator.cancelAnimation (&presetPanel, false);
+    animator.cancelAnimation (&groupBrowser, false);
     animator.cancelAnimation (&settingsPanel, false);
     canvas.removeMouseListener (this);
     proc.toneNote = -1; // closing the window while a key is held must not leave the tone on
@@ -714,6 +729,8 @@ void MetaTuneEditor::mouseDown (const juce::MouseEvent& e)
         showPresetPanel (false);
     if (settingsPanel.isVisible() && e.eventComponent != &settingsPanel && e.eventComponent != &menuButton)
         showSettingsPanel (false);
+    if (groupBrowser.isVisible() && e.eventComponent != &groupBrowser && e.eventComponent != &groups)
+        showGroupBrowser (false);
     if (! rootPicker.isVisible() || e.eventComponent == &rootPicker || rootPicker.isParentOf (e.eventComponent))
         return;
     const auto p = canvas.getLocalPoint (e.eventComponent, e.getPosition());
@@ -869,6 +886,42 @@ void MetaTuneEditor::refreshPresetPanel()
     for (const auto& e : proc.presetList())
         items.push_back ({ e.name, e.folder, e.factory });
     presetPanel.setItems (items, proc.ui.presetName);
+}
+
+void MetaTuneEditor::refreshGroupBrowser()
+{
+    juce::StringArray names;
+    for (int g = 0; g < 4; ++g) names.add (MetaTuneProcessor::groupName (g));
+    std::vector<GroupInstanceRow> rows;
+    for (const auto& inf : proc.groupInstances())
+        rows.push_back ({ inf.id, inf.group,
+                          inf.preset.isNotEmpty() ? inf.preset : "Instance " + juce::String (inf.id),
+                          inf.id == proc.instanceId });
+    groupBrowser.setData (names, rows);
+}
+
+void MetaTuneEditor::showGroupBrowser (bool show)
+{
+    auto& animator = juce::Desktop::getInstance().getAnimator();
+    if (show == groupBrowser.isVisible() && ! animator.isAnimating (&groupBrowser)) return;
+    if (show)
+    {
+        refreshGroupBrowser();
+        const int h = juce::jmin (groupBrowser.preferredHeight(), layout::rowY - 134);
+        const juce::Rectangle<int> open (54, 124, 272, h), tucked = open.translated (-12, 0);
+        showPresetPanel (false);
+        showSettingsPanel (false);
+        groupBrowser.setBounds (tucked);
+        groupBrowser.setAlpha (0.0f);
+        groupBrowser.setVisible (true);
+        groupBrowser.toFront (false);
+        animator.animateComponent (&groupBrowser, open, 1.0f, 170, false, 0.0, 0.0);
+    }
+    else
+    {
+        animator.animateComponent (&groupBrowser, groupBrowser.getBounds().translated (-12, 0), 0.0f, 130, true, 1.0, 1.0);
+        groupBrowser.setVisible (false);
+    }
 }
 
 void MetaTuneEditor::setScale (float s)

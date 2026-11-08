@@ -65,6 +65,15 @@ public:
     int getGroup() const noexcept { return ui.group; }
     static int groupMemberCount (int group);
 
+    // Group Browser: every live instance, named groups, and assignment by instance id.
+    struct GroupInstanceInfo { int id, group; juce::String preset; };
+    int instanceId = 0;
+    std::vector<GroupInstanceInfo> groupInstances() const;      // all live instances (sorted by id)
+    void setGroup (int group);                                  // non-toggling assign (adopts the group's sound)
+    static void setInstanceGroup (int id, int group);           // assign another instance by id
+    static juce::String groupName (int group);                  // user name or "Group N"
+    static void setGroupName (int group, const juce::String&);
+
     juce::UndoManager undoManager { 400, 20 }; // >= 20 user-visible transactions kept
     juce::AudioProcessorValueTreeState apvts;
     metatune::TelemetryQueue telemetry;            // audio -> editor, single consumer
