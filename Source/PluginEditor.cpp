@@ -74,7 +74,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     rootPicker.onRoot = [this] (int pc) { pickerPinned = false; setRoot (pc); };
     rootPicker.onScale = [this] (int i) { pickerPinned = false; applyPickedScale (i); };
     rootPicker.onFlats = [this] (bool f) { proc.ui.useFlats = f; canvas.repaint(); };
-    rootPicker.onClose = [this] { pickerPinned = false; showRootPicker (false); };
+    rootPicker.onClose = [this] { pickerPinned = false; };
     // Open/close is driven by the pointer poll in timerCallback (transform-safe, unlike mouse enter/exit
     // under a scaled canvas), so the panel's own leave handler stays out of it.
     rootPicker.onMouseLeave = nullptr;
@@ -129,7 +129,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     majorPill.onClick = [this] { selectScale (metatune::ScaleType::Major); };
     minorPill.onClick = [this] { selectScale (metatune::ScaleType::Minor); };
     chromaticPill.onClick = [this] { selectScale (metatune::ScaleType::Chromatic); };
-    scalePill.onClick = [this] { pickerPinned = ! (rootPicker.isVisible() && pickerPinned); showRootPicker (pickerPinned); };
+    scalePill.onClick = [this] { pickerPinned = true; };
     chromaticButton.onClick = [this] { selectScale (metatune::ScaleType::Chromatic); };
     lowLatency.onClick = [this] { proc.undoManager.beginNewTransaction ("Low Latency"); setParam (ParamID::range, lowLatency.getToggleState() ? 2.0f : 0.0f); };
 
@@ -274,7 +274,7 @@ void MetaTuneEditor::layout()
     detectedButton.setBounds (rightX + 2, 626, 130, 62);
     bypassButton.setBounds (rightX + 2, 691, 130, 68);
     refStrip.setBounds (rightX + 8, 796, 118, 50);
-    if (rootPicker.isVisible()) rootPicker.setBounds (0, bottomY, leftW - 1, 826 - bottomY);
+    // (the picker's bounds are driven every frame by updatePicker)
 }
 
 void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
@@ -560,19 +560,7 @@ void MetaTuneEditor::timerCallback()
         lowLatency.setTooltip ("Low Latency: track from 150 Hz up for the smallest delay. Now: " + kRangeNames[range] + ", "
                                + juce::String (proc.latencyMsFor (range), 1) + " ms added latency. Change while stopped.");
     }
-    // Scale picker follows the pointer: open while the cursor is over the root cell (or the panel),
-    // close when it leaves. Polled here so it never depends on throttled mouseMove or on enter/exit
-    // events, which are unreliable under the scaled canvas.
-    {
-        auto& animator = juce::Desktop::getInstance().getAnimator();
-        const auto screen = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition();
-        const auto mp = canvas.getLocalPoint (nullptr, screen).roundToInt();
-        const bool over = rootArea.contains (mp) || (rootPicker.isVisible() && rootPicker.getBounds().contains (mp));
-        if ((over || pickerPinned) && ! rootPicker.isVisible())
-            showRootPicker (true);
-        else if (! over && ! pickerPinned && rootPicker.isVisible() && ! animator.isAnimating (&rootPicker))
-            showRootPicker (false);
-    }
+    updatePicker();
 
     canvas.repaint (rootArea);                              // root letter / scale name
     canvas.repaint (1008, layout::rowY, 74, layout::rowH); // Low Latency caption colour
@@ -664,30 +652,37 @@ void MetaTuneEditor::syncRootPickerState()
     rootPicker.setState (int (state.getRawParameterValue (ParamID::root)->load()), idx, proc.ui.useFlats);
 }
 
-void MetaTuneEditor::showRootPicker (bool show)
+// Frame-driven scale picker: eased entirely here off the 60 Hz timer so the slide is identical and
+// reliable every time (no ComponentAnimator proxy/visibility races, no dependence on mouse enter/exit).
+void MetaTuneEditor::updatePicker()
 {
     using namespace layout;
     const juce::Rectangle<int> area (0, bottomY, leftW - 1, 826 - bottomY);
-    const juce::Rectangle<int> offLeft = area.translated (-area.getWidth(), 0); // tucked just off the left edge
-    auto& animator = juce::Desktop::getInstance().getAnimator();
-    if (show == rootPicker.isVisible() && ! animator.isAnimating (&rootPicker))
-        return;
-    if (show)
+    const int offX = -area.getWidth(); // fully tucked off the left edge at slide 0
+
+    // Target: open while the pointer is over the root cell or the (visible) panel, or while pinned.
+    const auto screen = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition();
+    const auto mp = canvas.getLocalPoint (nullptr, screen).roundToInt();
+    const bool over = rootArea.contains (mp) || (rootPicker.isVisible() && rootPicker.getBounds().contains (mp));
+    const float target = (over || pickerPinned) ? 1.0f : 0.0f;
+
+    // Smooth, symmetric exponential ease toward the target (fps-independent enough at a steady 60 Hz).
+    pickerSlide += (target - pickerSlide) * 0.20f;
+    if (std::abs (target - pickerSlide) < 0.0015f) pickerSlide = target;
+
+    const bool shouldShow = pickerSlide > 0.0015f;
+    if (shouldShow && ! rootPicker.isVisible())
     {
-        rootPicker.setBounds (offLeft);
+        syncRootPickerState();
         rootPicker.setAlpha (1.0f);
         rootPicker.setVisible (true);
         rootPicker.toFront (false);
-        syncRootPickerState(); // show the current root/scale before it slides in (never timerCallback - it re-enters here)
-        // Slide in from the left with a smooth ease in and out (no fade).
-        animator.animateComponent (&rootPicker, area, 1.0f, 340, false, 0.0, 0.0);
     }
-    else
-    {
-        // Slide back out to the left, smoothly.
-        animator.animateComponent (&rootPicker, offLeft, 1.0f, 260, true, 0.0, 0.0);
+    else if (! shouldShow && rootPicker.isVisible())
         rootPicker.setVisible (false);
-    }
+
+    if (rootPicker.isVisible())
+        rootPicker.setBounds (area.withX (juce::roundToInt (float (offX) * (1.0f - pickerSlide))));
 }
 
 void MetaTuneEditor::mouseDown (const juce::MouseEvent& e)
@@ -700,10 +695,7 @@ void MetaTuneEditor::mouseDown (const juce::MouseEvent& e)
         return;
     const auto p = canvas.getLocalPoint (e.eventComponent, e.getPosition());
     if (! rootArea.contains (p)) // a click outside the root cell / picker dismisses it
-    {
-        pickerPinned = false;
-        showRootPicker (false);
-    }
+        pickerPinned = false;      // updatePicker then eases it closed (pointer is already away)
 }
 
 juce::String MetaTuneEditor::scaleDisplayName() const

@@ -36,7 +36,7 @@ private:
     void setParam (const juce::String& id, float value);
     void selectScale (metatune::ScaleType);
     void selectNoteMode();
-    void showRootPicker (bool show);
+    void updatePicker();        // per-frame: eases the picker's slide toward the pointer/pin state
     void syncRootPickerState(); // push current root/scale into the picker
     void applyPickedScale (int index); // RootPicker::scaleNames() index
     juce::String scaleDisplayName() const;
@@ -92,6 +92,7 @@ private:
     juce::String updateStatus; // shown in the settings menu
     juce::Rectangle<int> rootArea;
     bool pickerPinned = false; // true = picker opened by clicking "Scale"; stays until a click elsewhere
+    float pickerSlide = 0.0f;  // 0 = tucked off the left edge / hidden, 1 = fully in; eased each frame
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 
     DisplayState display;
