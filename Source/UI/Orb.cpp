@@ -331,6 +331,38 @@ void Orb::paint (juce::Graphics& g)
         g.drawText ("BYPASSED", juce::Rectangle<float> (140.0f * U, 24.0f * U).withCentre (c.translated (0, (kCoreR + 30.0f) * U)), juce::Justification::centred);
     }
 
+    // Speed/Amount drag readout: a pill pops up at the centre so you can see the value move as you drag.
+    if (dragMode == Drag::Speed || dragMode == Drag::Amount)
+    {
+        auto* p = dragMode == Drag::Speed ? speedP : amountP;
+        const juce::String name = dragMode == Drag::Speed ? "SPEED" : "AMOUNT";
+        const juce::String val = p != nullptr ? p->getCurrentValueAsText() : juce::String();
+        const auto box = juce::Rectangle<float> (156.0f * U, 70.0f * U).withCentre (c);
+        juce::DropShadow (juce::Colours::black.withAlpha (0.6f), int (16 * U), {}).drawForRectangle (g, box.toNearestInt());
+        g.setColour (bg3.withAlpha (0.94f));
+        g.fillRoundedRectangle (box, 12.0f * U);
+        g.setColour (violet.withAlpha (0.55f));
+        g.drawRoundedRectangle (box.reduced (0.6f), 12.0f * U, 1.4f);
+        // Little up/down chevrons to signal it's a vertical drag.
+        g.setColour (text.withAlpha (0.5f));
+        const float cx = box.getCentreX();
+        for (int s : { -1, 1 })
+        {
+            const float yb = box.getCentreY() + float (s) * 26.0f * U;
+            juce::Path ch;
+            ch.startNewSubPath (cx - 5.0f * U, yb + float (s) * 3.0f * U);
+            ch.lineTo (cx, yb - float (s) * 3.0f * U);
+            ch.lineTo (cx + 5.0f * U, yb + float (s) * 3.0f * U);
+            g.strokePath (ch, juce::PathStrokeType (1.5f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        }
+        g.setColour (text);
+        g.setFont (font (28.0f * U, true));
+        g.drawText (val, box.withTrimmedBottom (22.0f * U), juce::Justification::centred);
+        g.setColour (textDim);
+        g.setFont (font (12.0f * U, true));
+        g.drawText (name, box.withTrimmedTop (46.0f * U), juce::Justification::centred);
+    }
+
     // Doubler guides: an L of axis lines with markers that follow the ball.
     const auto hp = handlePos();
     guide.setTarget (dragging || hoverHandle ? 1.0f : 0.0f);
@@ -435,6 +467,7 @@ void Orb::mouseDrag (const juce::MouseEvent& e)
             const float fine = e.mods.isShiftDown() ? 0.25f : 1.0f;
             const float dy = (dragStart.y - e.position.y) / (240.0f * unit()) * fine; // up = more
             p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, dragStartNorm + dy));
+            repaint();
         }
     }
 }

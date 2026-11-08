@@ -311,6 +311,7 @@ void MetaTuneProcessor::getStateInformation (juce::MemoryBlock& dest)
     u->setAttribute ("scaleLabel", ui.scaleLabel);
     u->setAttribute ("preset", ui.presetName);
     u->setAttribute ("keepScale", ui.keepScale);
+    u->setAttribute ("scaleSet", ui.scaleEverSet);
     copyXmlToBinary (root, dest);
 }
 
@@ -345,11 +346,16 @@ void MetaTuneProcessor::setStateInformation (const void* data, int size)
         ui.scaleLabel = u->getStringAttribute ("scaleLabel");
         ui.presetName = u->getStringAttribute ("preset");
         ui.keepScale = u->getBoolAttribute ("keepScale", true);
+        ui.scaleEverSet = u->getBoolAttribute ("scaleSet", false);
         ui.majorHold = u->getBoolAttribute ("majorHold", false);
         ui.minorHold = u->getBoolAttribute ("minorHold", false);
         ui.group = juce::jlimit (-1, 3, u->getIntAttribute ("group", -1));
         groupSynced = linkedValues(); // a loaded project keeps its own settings
     }
+    // Migration / safety: a project that already has a non-default key or scale has clearly been used,
+    // so never show the first-run prompt over it even if the flag predates this build.
+    if (! ui.scaleEverSet && (pScale->load() != 0.0f || pRoot->load() != 0.0f))
+        ui.scaleEverSet = true;
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new MetaTuneProcessor(); }

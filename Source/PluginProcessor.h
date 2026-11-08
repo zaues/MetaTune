@@ -72,6 +72,7 @@ public:
         juce::String scaleLabel;                   // name of a picked Custom scale (e.g. "pent maj"); empty = hand-made
         juce::String presetName;                   // last loaded/saved preset; empty = none
         bool keepScale = true;                     // keep current key/scale when loading presets (Keep My Scale)
+        bool scaleEverSet = false;                 // true once the user has picked any key/scale; hides the first-run prompt
         int group = -1;                            // -1 = not linked
         float scale = 0.85f;
     } ui;

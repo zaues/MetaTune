@@ -447,13 +447,12 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     g.drawText ("Pitch Reference", rightX, 772, kW - rightX, 18, juce::Justification::centred);
 
     const int root = juce::jlimit (0, 11, int (e.state.getRawParameterValue (ParamID::root)->load()));
-    const int scale = juce::jlimit (0, 3, int (e.state.getRawParameterValue (ParamID::scale)->load()));
     static const char* flatNames[] { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" };
     const juce::String name = e.proc.ui.useFlats ? flatNames[root] : kNoteNames[root];
     g.setColour (text);
-    if (scale == int (metatune::ScaleType::Chromatic))
+    if (! e.proc.ui.scaleEverSet)
     {
-        // No scale set yet: a mouse cursor and a prompt instead of a key.
+        // First run only (no key ever picked): a mouse cursor and a prompt instead of a key.
         const auto area = e.rootArea.withHeight (100).toFloat();
         juce::Path cur;
         cur.startNewSubPath (0.0f, 0.0f);
@@ -571,6 +570,9 @@ void MetaTuneEditor::timerCallback()
 
 void MetaTuneEditor::setParam (const juce::String& id, float value)
 {
+    // Any deliberate key/scale edit retires the first-run "Hover to set scale" prompt for good.
+    if (id == ParamID::scale || id == ParamID::root || id.startsWith ("note"))
+        proc.ui.scaleEverSet = true;
     if (auto* p = state.getParameter (id))
     {
         p->beginChangeGesture();
