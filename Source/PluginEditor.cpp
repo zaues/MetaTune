@@ -545,15 +545,7 @@ void MetaTuneEditor::timerCallback()
     if (presetBar.name != proc.ui.presetName) { presetBar.name = proc.ui.presetName; presetBar.repaint(); }
     syncModeButtons();
     if (rootPicker.isVisible())
-    {
-        const auto sc = metatune::ScaleType (int (state.getRawParameterValue (ParamID::scale)->load()));
-        int idx = RootPicker::scaleNames().indexOf (proc.ui.scaleLabel, true);
-        if (sc == metatune::ScaleType::Major) idx = 0;
-        if (sc == metatune::ScaleType::Minor) idx = 1;
-        if (sc == metatune::ScaleType::Chromatic) idx = RootPicker::scaleNames().indexOf ("Chromatic");
-        if (sc == metatune::ScaleType::Custom && proc.ui.scaleLabel.isEmpty()) idx = RootPicker::scaleNames().indexOf ("Custom");
-        rootPicker.setState (int (state.getRawParameterValue (ParamID::root)->load()), idx, proc.ui.useFlats);
-    }
+        syncRootPickerState();
 
     undoButton.setEnabled (proc.undoManager.canUndo());
     redoButton.setEnabled (proc.undoManager.canRedo());
@@ -661,6 +653,17 @@ void MetaTuneEditor::setRoot (int pc)
     setParam (ParamID::root, float (pc));
 }
 
+void MetaTuneEditor::syncRootPickerState()
+{
+    const auto sc = metatune::ScaleType (int (state.getRawParameterValue (ParamID::scale)->load()));
+    int idx = RootPicker::scaleNames().indexOf (proc.ui.scaleLabel, true);
+    if (sc == metatune::ScaleType::Major) idx = 0;
+    if (sc == metatune::ScaleType::Minor) idx = 1;
+    if (sc == metatune::ScaleType::Chromatic) idx = RootPicker::scaleNames().indexOf ("Chromatic");
+    if (sc == metatune::ScaleType::Custom && proc.ui.scaleLabel.isEmpty()) idx = RootPicker::scaleNames().indexOf ("Custom");
+    rootPicker.setState (int (state.getRawParameterValue (ParamID::root)->load()), idx, proc.ui.useFlats);
+}
+
 void MetaTuneEditor::showRootPicker (bool show)
 {
     using namespace layout;
@@ -671,11 +674,11 @@ void MetaTuneEditor::showRootPicker (bool show)
         return;
     if (show)
     {
-        timerCallback(); // sync the picker's selection before it appears
         rootPicker.setBounds (offLeft);
         rootPicker.setAlpha (1.0f);
         rootPicker.setVisible (true);
         rootPicker.toFront (false);
+        syncRootPickerState(); // show the current root/scale before it slides in (never timerCallback - it re-enters here)
         // Slide in from the left with a smooth ease in and out (no fade).
         animator.animateComponent (&rootPicker, area, 1.0f, 340, false, 0.0, 0.0);
     }

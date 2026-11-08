@@ -37,6 +37,7 @@ private:
     void selectScale (metatune::ScaleType);
     void selectNoteMode();
     void showRootPicker (bool show);
+    void syncRootPickerState(); // push current root/scale into the picker
     void applyPickedScale (int index); // RootPicker::scaleNames() index
     juce::String scaleDisplayName() const;
     void showPresetPanel (bool show);
