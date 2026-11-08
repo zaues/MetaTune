@@ -36,6 +36,7 @@ private:
     juce::Point<float> centre() const { return getLocalBounds().toFloat().getCentre(); }
     juce::Point<float> handlePos() const;
     juce::Rectangle<float> padArea() const;
+    juce::Rectangle<float> trackArea() const; // the L-shaped guide extents the handle travels within
     void renderImages();
 
     juce::RangedAudioParameter& xParam;

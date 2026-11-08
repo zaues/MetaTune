@@ -58,10 +58,19 @@ juce::Rectangle<float> Orb::padArea() const
     return getLocalBounds().toFloat().reduced (18.0f * unit());
 }
 
+juce::Rectangle<float> Orb::trackArea() const
+{
+    // The handle travels exactly between the drawn guide lines: vertical line top (room for the
+    // Dry/Wet label) down to the baseline, and the baseline across to the horizontal line's end.
+    const auto pad = padArea();
+    const float top = pad.getY() + 36.0f, right = pad.getRight() - 30.0f;
+    return { pad.getX(), top, right - pad.getX(), pad.getBottom() - top };
+}
+
 juce::Point<float> Orb::handlePos() const
 {
-    const auto p = padArea();
-    return { p.getX() + xNorm * p.getWidth(), p.getBottom() - yNorm * p.getHeight() };
+    const auto t = trackArea();
+    return { t.getX() + xNorm * t.getWidth(), t.getBottom() - yNorm * t.getHeight() };
 }
 
 bool Orb::hitTest (int x, int y)
@@ -385,9 +394,9 @@ void Orb::mouseDown (const juce::MouseEvent& e)
 void Orb::mouseDrag (const juce::MouseEvent& e)
 {
     if (! dragging) return;
-    const auto p = padArea();
-    xNorm = juce::jlimit (0.0f, 1.0f, (e.position.x - p.getX()) / p.getWidth());
-    yNorm = juce::jlimit (0.0f, 1.0f, (p.getBottom() - e.position.y) / p.getHeight());
+    const auto t = trackArea();
+    xNorm = juce::jlimit (0.0f, 1.0f, (e.position.x - t.getX()) / t.getWidth());
+    yNorm = juce::jlimit (0.0f, 1.0f, (t.getBottom() - e.position.y) / t.getHeight());
     xAttach.setValueAsPartOfGesture (xParam.convertFrom0to1 (xNorm));
     yAttach.setValueAsPartOfGesture (yParam.convertFrom0to1 (yNorm));
     repaint();

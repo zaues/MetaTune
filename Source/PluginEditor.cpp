@@ -33,10 +33,8 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
                                                             &stabilizerSeg, &groups, &presetBar, &notePill, &majorPill, &minorPill, &chromaticPill,
                                                             &scalePill, &lowLatency, &menuButton, &saveButton, &undoButton, &redoButton,
                                                             &resetButton, &aButton, &copyButton, &bButton, &helpButton, &heatButton,
-                                                            &detectedButton, &bypassButton, &chromaticButton, &rootHover })
+                                                            &detectedButton, &bypassButton, &chromaticButton })
         canvas.addAndMakeVisible (c);
-    rootHover.onEnter = [this] { showRootPicker (true); };
-    rootHover.onClick = [this] { showRootPicker (true); };
     canvas.addChildComponent (rootPicker);
     canvas.addChildComponent (presetPanel);
     canvas.addChildComponent (settingsPanel);
@@ -73,15 +71,13 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
             showPresetPanel (false);
     };
     canvas.addMouseListener (this, true);
-    rootPicker.onRoot = [this] (int pc) { setRoot (pc); };
-    rootPicker.onScale = [this] (int i) { applyPickedScale (i); };
+    rootPicker.onRoot = [this] (int pc) { pickerPinned = false; setRoot (pc); };
+    rootPicker.onScale = [this] (int i) { pickerPinned = false; applyPickedScale (i); };
     rootPicker.onFlats = [this] (bool f) { proc.ui.useFlats = f; canvas.repaint(); };
-    rootPicker.onClose = [this] { showRootPicker (false); };
-    rootPicker.onMouseLeave = [this] {
-        // Close when the pointer really left the panel (not just moved onto a popup or child).
-        if (! rootPicker.getLocalBounds().contains (rootPicker.getMouseXYRelative()))
-            showRootPicker (false);
-    };
+    rootPicker.onClose = [this] { pickerPinned = false; showRootPicker (false); };
+    // Open/close is driven by the pointer poll in timerCallback (transform-safe, unlike mouse enter/exit
+    // under a scaled canvas), so the panel's own leave handler stays out of it.
+    rootPicker.onMouseLeave = nullptr;
 
     // Speed: 400 ms .. 0 over the ticks (skewed like the parameter), 0 .. -3 ms over the gradient band.
     {
@@ -133,7 +129,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     majorPill.onClick = [this] { selectScale (metatune::ScaleType::Major); };
     minorPill.onClick = [this] { selectScale (metatune::ScaleType::Minor); };
     chromaticPill.onClick = [this] { selectScale (metatune::ScaleType::Chromatic); };
-    scalePill.onClick = [this] { showRootPicker (! rootPicker.isVisible()); };
+    scalePill.onClick = [this] { pickerPinned = ! (rootPicker.isVisible() && pickerPinned); showRootPicker (pickerPinned); };
     chromaticButton.onClick = [this] { selectScale (metatune::ScaleType::Chromatic); };
     lowLatency.onClick = [this] { proc.undoManager.beginNewTransaction ("Low Latency"); setParam (ParamID::range, lowLatency.getToggleState() ? 2.0f : 0.0f); };
 
@@ -273,7 +269,6 @@ void MetaTuneEditor::layout()
     keyboard.setBounds (leftW, bottomY, rightX - leftW, kH - bottomY);
     toneSlider.setBounds (8, 650, 116, 24);
     rootArea = { 0, 690, leftW, 132 };
-    rootHover.setBounds (rootArea);
     chromaticButton.setBounds (0, 826, leftW, 30);
     heatButton.setBounds (rightX + 2, 582, 130, 42);
     detectedButton.setBounds (rightX + 2, 626, 130, 62);
@@ -573,6 +568,20 @@ void MetaTuneEditor::timerCallback()
         lowLatency.setTooltip ("Low Latency: track from 150 Hz up for the smallest delay. Now: " + kRangeNames[range] + ", "
                                + juce::String (proc.latencyMsFor (range), 1) + " ms added latency. Change while stopped.");
     }
+    // Scale picker follows the pointer: open while the cursor is over the root cell (or the panel),
+    // close when it leaves. Polled here so it never depends on throttled mouseMove or on enter/exit
+    // events, which are unreliable under the scaled canvas.
+    {
+        auto& animator = juce::Desktop::getInstance().getAnimator();
+        const auto screen = juce::Desktop::getInstance().getMainMouseSource().getScreenPosition();
+        const auto mp = canvas.getLocalPoint (nullptr, screen).roundToInt();
+        const bool over = rootArea.contains (mp) || (rootPicker.isVisible() && rootPicker.getBounds().contains (mp));
+        if ((over || pickerPinned) && ! rootPicker.isVisible())
+            showRootPicker (true);
+        else if (! over && ! pickerPinned && rootPicker.isVisible() && ! animator.isAnimating (&rootPicker))
+            showRootPicker (false);
+    }
+
     canvas.repaint (rootArea);                              // root letter / scale name
     canvas.repaint (1008, layout::rowY, 74, layout::rowH); // Low Latency caption colour
 }
@@ -687,8 +696,11 @@ void MetaTuneEditor::mouseDown (const juce::MouseEvent& e)
     if (! rootPicker.isVisible() || e.eventComponent == &rootPicker || rootPicker.isParentOf (e.eventComponent))
         return;
     const auto p = canvas.getLocalPoint (e.eventComponent, e.getPosition());
-    if (! rootArea.contains (p)) // the root area toggles the picker itself on mouse-up
+    if (! rootArea.contains (p)) // a click outside the root cell / picker dismisses it
+    {
+        pickerPinned = false;
         showRootPicker (false);
+    }
 }
 
 juce::String MetaTuneEditor::scaleDisplayName() const

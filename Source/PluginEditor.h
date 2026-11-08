@@ -24,26 +24,7 @@ private:
     {
         explicit Canvas (MetaTuneEditor& e) : owner (e) {}
         void paint (juce::Graphics&) override;
-        void mouseUp (const juce::MouseEvent& e) override
-        {
-            if (owner.rootArea.contains (e.getPosition()) && owner.rootArea.contains (e.getMouseDownPosition()))
-                owner.showRootPicker (! owner.rootPicker.isVisible());
-        }
-        void mouseMove (const juce::MouseEvent& e) override
-        {
-            if (owner.rootArea.contains (e.getPosition()) && ! owner.rootPicker.isVisible())
-                owner.showRootPicker (true);
-        }
         MetaTuneEditor& owner;
-    };
-
-    // Invisible hit zone over the root/scale cell. Uses mouseEnter (delivered reliably by hosts,
-    // unlike continuous mouseMove) so hovering opens the scale picker.
-    struct HoverZone : public juce::Component
-    {
-        std::function<void()> onEnter, onClick;
-        void mouseEnter (const juce::MouseEvent&) override { if (onEnter) onEnter(); }
-        void mouseUp (const juce::MouseEvent& e) override { if (onClick && getLocalBounds().contains (e.getPosition())) onClick(); }
     };
 
     void timerCallback() override;
@@ -109,7 +90,7 @@ private:
     std::optional<update::Release> pendingUpdate;
     juce::String updateStatus; // shown in the settings menu
     juce::Rectangle<int> rootArea;
-    HoverZone rootHover;
+    bool pickerPinned = false; // true = picker opened by clicking "Scale"; stays until a click elsewhere
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 
     DisplayState display;
