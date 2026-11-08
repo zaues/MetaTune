@@ -30,8 +30,8 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     addAndMakeVisible (canvas);
 
     for (auto* c : std::initializer_list<juce::Component*> { &orb, &speedKnob, &sustainKnob, &amountKnob, &keyboard, &refStrip, &toneSlider,
-                                                            &stabilizerSeg, &groups, &presetBar, &notePill, &majorPill, &majorHold, &minorPill,
-                                                            &minorHold, &lowLatency, &menuButton, &saveButton, &undoButton, &redoButton,
+                                                            &stabilizerSeg, &groups, &presetBar, &notePill, &majorPill, &minorPill, &chromaticPill,
+                                                            &scalePill, &lowLatency, &menuButton, &saveButton, &undoButton, &redoButton,
                                                             &resetButton, &aButton, &copyButton, &bButton, &helpButton, &heatButton,
                                                             &detectedButton, &bypassButton, &chromaticButton })
         canvas.addAndMakeVisible (c);
@@ -130,9 +130,9 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     notePill.onClick = [this] { selectNoteMode(); };
     majorPill.onClick = [this] { selectScale (metatune::ScaleType::Major); };
     minorPill.onClick = [this] { selectScale (metatune::ScaleType::Minor); };
+    chromaticPill.onClick = [this] { selectScale (metatune::ScaleType::Chromatic); };
+    scalePill.onClick = [this] { showRootPicker (! rootPicker.isVisible()); };
     chromaticButton.onClick = [this] { selectScale (metatune::ScaleType::Chromatic); };
-    majorHold.onClick = [this] { proc.ui.majorHold = ! proc.ui.majorHold; if (proc.ui.majorHold) proc.ui.minorHold = false; syncModeButtons(); };
-    minorHold.onClick = [this] { proc.ui.minorHold = ! proc.ui.minorHold; if (proc.ui.minorHold) proc.ui.majorHold = false; syncModeButtons(); };
     lowLatency.onClick = [this] { proc.undoManager.beginNewTransaction ("Low Latency"); setParam (ParamID::range, lowLatency.getToggleState() ? 2.0f : 0.0f); };
 
     groups.setSelected (proc.ui.group);
@@ -168,9 +168,9 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     notePill.setTooltip ("Note: pick allowed notes yourself by clicking keys.");
     majorPill.setTooltip ("Major scale on the current root.");
     minorPill.setTooltip ("Minor scale on the current root.");
-    majorHold.setTooltip ("Hold: clicking a key makes it the root of a major scale.");
-    minorHold.setTooltip ("Hold: clicking a key makes it the root of a minor scale.");
-    stabilizerSeg.setTooltip ("Note Stabilizer: a new note must hold this long before the tuner moves to it (Short 40 ms, Mid 80 ms, Long 200 ms). Stops quick passing notes from being snapped.");
+    chromaticPill.setTooltip ("Chromatic scale: all notes allowed.");
+    scalePill.setTooltip ("Pick a scale and root.");
+    stabilizerSeg.setTooltip ("Note Transition: how long a new note must hold before the tuner moves to it (Low 40 ms, Mid 80 ms, High 200 ms). Stops quick passing notes from being snapped.");
     refStrip.setTooltip ("Reference tuning for A4. Drag, Shift-drag for fine, double-click for 440 Hz.");
     toneSlider.setTooltip ("Volume of the tone generator: hold a key on the keyboard to hear that note.");
     groups.setTooltip ("Groups: copies of the plugin in the same group share their settings. The small number shows how many copies are in each group. Click your group again to leave it.");
@@ -183,7 +183,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     bButton.setTooltip ("Snapshot B");
     copyButton.setTooltip ("Copy the current snapshot to the other one");
     helpButton.setTooltip ("Show/hide tooltips");
-    heatButton.setTooltip ("Show/hide the input and output HeatMaps");
+    heatButton.setTooltip ("Show/hide the input and output overlays");
     detectedButton.setTooltip ("Show/hide detected input note and output target on the keyboard");
     bypassButton.setTooltip ("Bypass all processing (latency stays compensated)");
     menuButton.setTooltip ("Settings");
@@ -259,11 +259,11 @@ void MetaTuneEditor::layout()
     speedKnob.setCutout (sustainC, sustainR);
 
     // Mode row.
-    notePill.setBounds (133, rowY + 8, 90, 32);
-    majorPill.setBounds (237, rowY + 8, 60, 32);
-    majorHold.setBounds (297, rowY + 8, 52, 32);
-    minorPill.setBounds (365, rowY + 8, 60, 32);
-    minorHold.setBounds (425, rowY + 8, 54, 32);
+    notePill.setBounds (133, rowY + 8, 84, 32);
+    majorPill.setBounds (237, rowY + 8, 62, 32);
+    minorPill.setBounds (299, rowY + 8, 58, 32);
+    chromaticPill.setBounds (357, rowY + 8, 90, 32);
+    scalePill.setBounds (447, rowY + 8, 62, 32);
     stabilizerSeg.setBounds (545, rowY + 7, 275, 34);
     lowLatency.setBounds (962, rowY + 13, 40, 22);
 
@@ -292,12 +292,14 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     g.setColour (headerBox);
     g.fillRect (342, 0, 58, headerH);
     {
-        // Logo tile: an original bolt mark.
+        // Logo tile: a menu mark.
         const auto tile = juce::Rectangle<float> (8, 8, 36, 36);
         g.setGradientFill (juce::ColourGradient (juce::Colour (0xff4a4a4e), tile.getX(), tile.getY(), juce::Colour (0xff2c2c2f), tile.getX(), tile.getBottom(), false));
         g.fillRoundedRectangle (tile, 5.0f);
         g.setColour (text.withAlpha (0.85f));
-        g.strokePath (bolt (tile.reduced (9.0f, 7.0f)), juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        auto bars = icons::menu();
+        g.strokePath (bars, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
+                      bars.getTransformToScaleToFit (tile.reduced (9.0f, 8.0f), true));
     }
     {
         // Title cell: dark nebula behind the wordmark.
@@ -400,8 +402,7 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     g.drawText ("Select", 24, rowY, 60, rowH, juce::Justification::centredLeft);
     g.fillRect (96, rowY + rowH / 2, 20, 1);
     g.setColour (juce::Colour (0xff2a2a2d));
-    g.fillRoundedRectangle (235.0f, float (rowY + 8), 116.0f, 32.0f, 16.0f);
-    g.fillRoundedRectangle (363.0f, float (rowY + 8), 118.0f, 32.0f, 16.0f);
+    g.fillRoundedRectangle (233.0f, float (rowY + 8), 278.0f, 32.0f, 16.0f);
     {
         const auto box = juce::Rectangle<float> (540.0f, float (rowY + 5), 406.0f, 38.0f);
         g.setColour (juce::Colour (0xff0e0e0f));
@@ -413,7 +414,7 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
         g.fillRoundedRectangle (lbl, 15.0f);
         g.setColour (text.withAlpha (0.9f));
         g.setFont (font (14.0f, true));
-        g.drawText ("Note Stabilizer", lbl, juce::Justification::centred);
+        g.drawText ("Note Transition", lbl, juce::Justification::centred);
     }
     g.setColour (e.lowLatency.getToggleState() ? text : greyText);
     g.setFont (font (13.0f, true));
@@ -446,10 +447,29 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
 
     const int root = juce::jlimit (0, 11, int (e.state.getRawParameterValue (ParamID::root)->load()));
     const int scale = juce::jlimit (0, 3, int (e.state.getRawParameterValue (ParamID::scale)->load()));
-    juce::ignoreUnused (scale);
     static const char* flatNames[] { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" };
     const juce::String name = e.proc.ui.useFlats ? flatNames[root] : kNoteNames[root];
     g.setColour (text);
+    if (scale == int (metatune::ScaleType::Chromatic))
+    {
+        // No scale set yet: a mouse cursor and a prompt instead of a key.
+        const auto area = e.rootArea.withHeight (100).toFloat();
+        juce::Path cur;
+        cur.startNewSubPath (0.0f, 0.0f);
+        cur.lineTo (0.0f, 16.0f);
+        cur.lineTo (4.2f, 11.8f);
+        cur.lineTo (7.0f, 18.0f);
+        cur.lineTo (9.4f, 17.0f);
+        cur.lineTo (6.7f, 11.0f);
+        cur.lineTo (12.5f, 11.0f);
+        cur.closeSubPath();
+        const auto curBox = juce::Rectangle<float> (24.0f, 32.0f).withCentre ({ area.getCentreX(), area.getCentreY() - 6.0f });
+        g.fillPath (cur, cur.getTransformToScaleToFit (curBox, true));
+        g.setColour (text.withAlpha (0.9f));
+        g.setFont (font (15.0f, true));
+        g.drawFittedText ("Hover to\nset scale", e.rootArea.withTrimmedTop (56).withHeight (48), juce::Justification::centredTop, 2, 1.0f);
+    }
+    else
     {
         // Letter large; an accidental sits raised and smaller to its right.
         juce::AttributedString as;
@@ -460,9 +480,9 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
         tl.createLayout (as, 200.0f);
         const auto area = e.rootArea.withHeight (100).toFloat();
         tl.draw (g, juce::Rectangle<float> (tl.getWidth(), tl.getHeight()).withCentre (area.getCentre()));
+        g.setFont (font (19.0f, true));
+        g.drawText (e.scaleDisplayName(), e.rootArea.withTrimmedTop (98).withHeight (26), juce::Justification::centred);
     }
-    g.setFont (font (19.0f, true));
-    g.drawText (e.scaleDisplayName(), e.rootArea.withTrimmedTop (98).withHeight (26), juce::Justification::centred);
 
     // Chromatic tab.
     juce::Path tab;
@@ -474,11 +494,11 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
 void MetaTuneEditor::syncModeButtons()
 {
     const auto scale = metatune::ScaleType (juce::jlimit (0, 3, int (state.getRawParameterValue (ParamID::scale)->load())));
-    notePill.setToggleState (scale == metatune::ScaleType::Chromatic || scale == metatune::ScaleType::Custom, juce::dontSendNotification);
+    notePill.setToggleState (scale == metatune::ScaleType::Custom && proc.ui.scaleLabel.isEmpty(), juce::dontSendNotification);
     majorPill.setToggleState (scale == metatune::ScaleType::Major, juce::dontSendNotification);
     minorPill.setToggleState (scale == metatune::ScaleType::Minor, juce::dontSendNotification);
-    majorHold.setToggleState (proc.ui.majorHold, juce::dontSendNotification);
-    minorHold.setToggleState (proc.ui.minorHold, juce::dontSendNotification);
+    chromaticPill.setToggleState (scale == metatune::ScaleType::Chromatic, juce::dontSendNotification);
+    scalePill.setToggleState (scale == metatune::ScaleType::Custom && proc.ui.scaleLabel.isNotEmpty(), juce::dontSendNotification);
     lowLatency.setToggleState (int (state.getRawParameterValue (ParamID::range)->load()) == 2, juce::dontSendNotification);
 }
 

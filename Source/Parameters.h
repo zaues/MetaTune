@@ -30,8 +30,8 @@ inline const juce::StringArray kRangeNames { "Low (70 Hz)", "Mid (100 Hz)", "Hig
 inline constexpr double kRangeMinHz[] { 70.0, 100.0, 150.0 };
 inline double rangeMinHz (float index) { return kRangeMinHz[juce::jlimit (0, 2, int (index))]; }
 
-// Note Stabilizer: how long a new note must hold before the tuner retargets.
-inline const juce::StringArray kStabilizerNames { "None", "Short", "Mid", "Long" };
+// Note Transition / Tone: how long a new note must hold before the tuner retargets.
+inline const juce::StringArray kStabilizerNames { "Tone", "Low", "Mid", "High" };
 inline constexpr double kStabilizerMs[] { 0.0, 40.0, 80.0, 200.0 };
 
 inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
@@ -72,7 +72,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamID::sustain, v3 }, "Sustain",
         NormalisableRange<float> (0.0f, 100.0f, 1.0f), 0.0f,
         AudioParameterFloatAttributes().withStringFromValueFunction ([] (float x, int) { return String (x, 0); })));
-    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { ParamID::stabilizer, v3 }, "Note Stabilizer", kStabilizerNames, 0));
+    layout.add (std::make_unique<AudioParameterChoice> (ParameterID { ParamID::stabilizer, v3 }, "Note Transition", kStabilizerNames, 0));
     layout.add (std::make_unique<AudioParameterFloat> (ParameterID { ParamID::toneVolume, v3 }, "Tone Volume",
         NormalisableRange<float> (-60.0f, 0.0f, 0.1f), -18.0f,
         AudioParameterFloatAttributes().withLabel ("dB").withStringFromValueFunction ([] (float x, int) { return String (x, 1) + " dB"; })));

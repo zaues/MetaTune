@@ -81,17 +81,17 @@ private:
     SavePresetCard saveCard;
 
     TextPill notePill { "Note", TextPill::Kind::Primary };
-    TextPill majorPill { "Major", TextPill::Kind::Plain }, majorHold { "Hold", TextPill::Kind::Plain };
-    TextPill minorPill { "Minor", TextPill::Kind::Plain }, minorHold { "Hold", TextPill::Kind::Plain };
+    TextPill majorPill { "Major", TextPill::Kind::Plain }, minorPill { "Minor", TextPill::Kind::Plain };
+    TextPill chromaticPill { "Chromatic", TextPill::Kind::Plain }, scalePill { "Scale", TextPill::Kind::Plain };
     ToggleSwitch lowLatency;
 
-    IconButton menuButton { "menu", icons::panel() };
+    IconButton menuButton { "menu", icons::menu() };
     IconButton saveButton { "save", icons::save() };
     IconButton undoButton { "undo", icons::undo() }, redoButton { "redo", icons::redo() }, resetButton { "reset", icons::loop() };
     PillButton aButton { "A" }, bButton { "B" };
     IconButton copyButton { "copy", icons::copyArrow() };
     IconButton helpButton { "tips", icons::chat() };
-    IconButton heatButton { "heat", icons::eye(), "In/Out\nHeatMaps", icons::swap() };
+    IconButton heatButton { "heat", icons::eye(), "No Pitch\nReference", icons::swap() };
     IconButton detectedButton { "detected", icons::eye(), "Detected\nNotes", icons::swap() };
     IconButton bypassButton { "bypass", icons::power(), "Global\nBypass" };
     IconButton chromaticButton { "chromatic", icons::swap(), "Chromatic" };
