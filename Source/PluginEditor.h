@@ -94,6 +94,7 @@ private:
     juce::Rectangle<int> rootArea;
     bool pickerPinned = false; // true = picker opened by clicking "Scale"; stays until a click elsewhere
     float pickerSlide = 0.0f;  // 0 = tucked off the left edge / hidden, 1 = fully in; eased each frame
+    int toneChordMode = 0;     // 0 single, 1 major, 2 minor: what the tone generator plays on a key press
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 
     DisplayState display;

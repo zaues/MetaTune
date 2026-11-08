@@ -150,6 +150,7 @@ void MetaTuneProcessor::process (juce::AudioBuffer<float>& buffer, bool forceByp
     s.doublerMix = pDblMix->load() / 100.0;
     s.doublerWidth = pDblWidth->load() / 100.0;
     s.toneNote = toneNote.load();
+    s.toneChord = toneChord.load();
     s.toneGain = juce::Decibels::decibelsToGain (double (pToneVol->load()), -60.0);
     chain.setSettings (s);
     chain.process (buffer.getArrayOfWritePointers(), numCh, buffer.getNumSamples());
@@ -209,7 +210,10 @@ const FactoryPreset kFactory[] {
     { "Subtle Polish", { { "speed", 200 }, { "amount", 50 }, { "sustain", 40 }, { "stabilizer", 3 }, { "dblMix", 0 }, { "dblWidth", 0 } } },
     { "Robot",         { { "speed", -3 }, { "amount", 100 }, { "sustain", 100 }, { "stabilizer", 0 }, { "dblMix", 15 }, { "dblWidth", 30 } } },
 };
-bool keepsKey (const juce::String& id) { return id == "bypass" || id == "root" || id == "scale" || id == "range" || id.startsWith ("note"); }
+// Always left as-is when loading a preset (not musical content / latency-affecting).
+bool alwaysKeeps (const juce::String& id) { return id == "bypass" || id == "range"; }
+// Key/scale content: kept only while "Keep My Scale" is on.
+bool isScaleParam (const juce::String& id) { return id == "root" || id == "scale" || id.startsWith ("note"); }
 } // namespace
 
 juce::File MetaTuneProcessor::presetFolder()
@@ -234,7 +238,7 @@ juce::StringArray MetaTuneProcessor::presetNames() const
 void MetaTuneProcessor::applyValues (const juce::StringPairArray& values)
 {
     for (const auto& id : values.getAllKeys())
-        if (! keepsKey (id))
+        if (! (alwaysKeeps (id) || (ui.keepScale && isScaleParam (id))))
             if (auto* p = apvts.getParameter (id))
             {
                 p->beginChangeGesture();
@@ -306,6 +310,7 @@ void MetaTuneProcessor::getStateInformation (juce::MemoryBlock& dest)
     u->setAttribute ("flats", ui.useFlats);
     u->setAttribute ("scaleLabel", ui.scaleLabel);
     u->setAttribute ("preset", ui.presetName);
+    u->setAttribute ("keepScale", ui.keepScale);
     copyXmlToBinary (root, dest);
 }
 
@@ -339,6 +344,7 @@ void MetaTuneProcessor::setStateInformation (const void* data, int size)
         ui.useFlats = u->getBoolAttribute ("flats", false);
         ui.scaleLabel = u->getStringAttribute ("scaleLabel");
         ui.presetName = u->getStringAttribute ("preset");
+        ui.keepScale = u->getBoolAttribute ("keepScale", true);
         ui.majorHold = u->getBoolAttribute ("majorHold", false);
         ui.minorHold = u->getBoolAttribute ("minorHold", false);
         ui.group = juce::jlimit (-1, 3, u->getIntAttribute ("group", -1));

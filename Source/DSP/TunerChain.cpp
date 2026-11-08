@@ -60,7 +60,15 @@ void TunerChain::setSettings (const Settings& s) noexcept
     dMixTarget = float (std::clamp (s.doublerMix, 0.0, 1.0));
     dWidthTarget = float (std::clamp (s.doublerWidth, 0.0, 1.0));
     refHz = s.correction.referenceHz;
-    if (s.toneNote >= 0) { toneNote = s.toneNote; toneHz = refHz * std::exp2 ((toneNote - 69) / 12.0); }
+    if (s.toneNote >= 0)
+    {
+        toneNote = s.toneNote;
+        toneChord = s.toneChord;
+        const auto hz = [this] (int semis) { return refHz * std::exp2 ((toneNote + semis - 69) / 12.0); };
+        toneHz = hz (0);
+        toneHz3rd = hz (toneChord == 2 ? 3 : 4); // minor or major third
+        toneHz5th = hz (7);                       // perfect fifth
+    }
     else toneNote = -1;
     toneGain = float (std::clamp (s.toneGain, 0.0, 1.0));
 }
@@ -157,14 +165,19 @@ void TunerChain::process (float* const* ch, int numCh, int total) noexcept
         // Reference tone, after bypass so it can be heard either way.
         if (toneNote >= 0 || toneEnv > 0.0f)
         {
-            const double inc = kTwoPi * toneHz / sr;
+            const bool chord = toneChord > 0;
+            const double inc = kTwoPi * toneHz / sr, inc3 = kTwoPi * toneHz3rd / sr, inc5 = kTwoPi * toneHz5th / sr;
+            const float level = toneGain * 0.5f * (chord ? 0.6f : 1.0f); // trim a triad so it doesn't clip
             for (int i = 0; i < n; ++i)
             {
                 const float target = toneNote >= 0 ? 1.0f : 0.0f;
                 toneEnv = toneEnv < target ? std::min (target, toneEnv + toneStep) : std::max (target, toneEnv - toneStep);
-                const float sample = float (std::sin (tonePhase)) * toneEnv * toneGain * 0.5f;
-                tonePhase += inc;
-                if (tonePhase > kTwoPi) tonePhase -= kTwoPi;
+                float s = float (std::sin (tonePhase));
+                if (chord) s += float (std::sin (tonePhase3rd)) + float (std::sin (tonePhase5th));
+                const float sample = s * toneEnv * level;
+                tonePhase += inc;   if (tonePhase > kTwoPi) tonePhase -= kTwoPi;
+                tonePhase3rd += inc3; if (tonePhase3rd > kTwoPi) tonePhase3rd -= kTwoPi;
+                tonePhase5th += inc5; if (tonePhase5th > kTwoPi) tonePhase5th -= kTwoPi;
                 for (int c = 0; c < numCh; ++c) io[c][i] += sample;
             }
         }

@@ -61,6 +61,7 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     metatune::TelemetryQueue telemetry;            // audio -> editor, single consumer
     std::atomic<int> toneNote { -1 };           // editor -> audio: reference tone MIDI note, -1 = off
+    std::atomic<int> toneChord { 0 };           // editor -> audio: 0 single, 1 major triad, 2 minor triad
 
     // Display preferences: not parameters (not automatable, not part of A/B), saved with the project.
     struct UiSettings
@@ -70,6 +71,7 @@ public:
         bool useFlats = false;                     // note names: Db instead of C#
         juce::String scaleLabel;                   // name of a picked Custom scale (e.g. "pent maj"); empty = hand-made
         juce::String presetName;                   // last loaded/saved preset; empty = none
+        bool keepScale = true;                     // keep current key/scale when loading presets (Keep My Scale)
         int group = -1;                            // -1 = not linked
         float scale = 0.85f;
     } ui;

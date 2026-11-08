@@ -38,6 +38,7 @@ public:
         double doublerMix = 0.0;   // 0..1: level of the two doubled voices
         double doublerWidth = 0.0; // 0..1: centre -> hard left/right
         int toneNote = -1;         // MIDI note of the reference tone, -1 = off
+        int toneChord = 0;         // 0 = single note, 1 = major triad, 2 = minor triad
         double toneGain = 0.0;     // linear
     };
 
@@ -67,10 +68,11 @@ private:
     float voice[2][kSubBlock] {}, voiceRatio[2][kSubBlock] {};
     float dMix = 0, dMixTarget = 0, dWidth = 0, dWidthTarget = 0;
     double voicePeriod = 0;
-    // Reference tone: sine at toneNote with a short attack/release.
+    // Reference tone: sine at toneNote (plus a triad's 3rd and 5th when toneChord > 0), short A/R.
     double tonePhase = 0, toneHz = 0, refHz = 440;
+    double tonePhase3rd = 0, tonePhase5th = 0, toneHz3rd = 0, toneHz5th = 0;
     float toneEnv = 0, toneGain = 0, toneStep = 0.001f;
-    int toneNote = -1;
+    int toneNote = -1, toneChord = 0;
     TelemetryQueue* telemetry = nullptr;
     double sr = 48000, minFreq = 70;
     float wet = 1, wetTarget = 1, wetStep = 0.01f, smoothStep = 0.001f;

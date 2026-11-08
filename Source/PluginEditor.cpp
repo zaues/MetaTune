@@ -45,6 +45,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
         if (id == 600) update::Settings::setAutoCheck (! update::Settings::autoCheck());
         if (id == 601) startUpdateCheck();
         if (id == 602) installUpdate();
+        if (id == 603) proc.ui.keepScale = ! proc.ui.keepScale;
     };
     settingsPanel.onMouseLeave = [this] {
         if (! settingsPanel.getLocalBounds().contains (settingsPanel.getMouseXYRelative()))
@@ -110,7 +111,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     keyboard.onToggleNote = [this] (int pc) { keyClicked (pc); };
     keyboard.onSetRoot = [this] (int pc) { setRoot (pc); };
     // Holding a key plays the reference tone (C4..B4) at Tone Volume.
-    keyboard.onPress = [this] (int pc) { proc.toneNote = 60 + pc; };
+    keyboard.onPress = [this] (int pc) { proc.toneChord = toneChordMode; proc.toneNote = 60 + pc; };
     keyboard.onRelease = [this] { proc.toneNote = -1; };
 
     undoButton.onClick = [this] { proc.undoManager.undo(); };
@@ -125,10 +126,10 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     presetBar.onPrev = [this] { stepPreset (-1); };
     presetBar.onNext = [this] { stepPreset (+1); };
 
-    notePill.onClick = [this] { selectNoteMode(); };
-    majorPill.onClick = [this] { selectKeyScale (metatune::ScaleType::Major); };
-    minorPill.onClick = [this] { selectKeyScale (metatune::ScaleType::Minor); };
-    chromaticPill.onClick = [this] { selectScale (metatune::ScaleType::Chromatic); };
+    notePill.onClick = [this] { toneChordMode = 0; selectNoteMode(); };
+    majorPill.onClick = [this] { toneChordMode = 1; selectKeyScale (metatune::ScaleType::Major); };
+    minorPill.onClick = [this] { toneChordMode = 2; selectKeyScale (metatune::ScaleType::Minor); };
+    chromaticPill.onClick = [this] { toneChordMode = 0; selectScale (metatune::ScaleType::Chromatic); };
     scalePill.onClick = [this] { pickerPinned = true; };
     chromaticButton.onClick = [this] { selectScale (metatune::ScaleType::Chromatic); };
     lowLatency.onClick = [this] { proc.undoManager.beginNewTransaction ("Low Latency"); setParam (ParamID::range, lowLatency.getToggleState() ? 2.0f : 0.0f); };
@@ -754,6 +755,8 @@ void MetaTuneEditor::showSettingsPanel (bool show)
         items.push_back ({ Item::Kind::Header, "Window size" });
         for (int pct : { 60, 75, 85, 100, 125, 150 })
             items.push_back ({ Item::Kind::Choice, juce::String (pct) + " %", {}, pct, std::abs (proc.ui.scale * 100.0f - float (pct)) < 1.0f });
+        items.push_back ({ Item::Kind::Header, "Presets" });
+        items.push_back ({ Item::Kind::Choice, "Keep My Scale", {}, 603, proc.ui.keepScale });
         items.push_back ({ Item::Kind::Header, "Range (lowest note)" });
         const int range = int (state.getRawParameterValue (ParamID::range)->load());
         for (int i = 0; i < 3; ++i)
