@@ -108,6 +108,8 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     refStrip.setDoubleClickReturnValue (true, 440.0);
     toneSlider.setDoubleClickReturnValue (true, -18.0);
 
+    orb.setSpeedAmount (state.getParameter (ParamID::speed), state.getParameter (ParamID::amount));
+
     keyboard.onToggleNote = [this] (int pc) { keyClicked (pc); };
     keyboard.onSetRoot = [this] (int pc) { setRoot (pc); };
     // Holding a key plays the reference tone (C4..B4) at Tone Volume.
@@ -162,7 +164,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     speedKnob.setTooltip ("How quickly the voice snaps to the right note. Lower = harder; the coloured band is the robotic zone.");
     sustainKnob.setTooltip ("Tightens long held notes while the start of each note stays natural.");
     amountKnob.setTooltip ("How much of the tuning you hear. 0 leaves the voice untouched.");
-    orb.setTooltip ("Live pitch view. Arc on the ring = correction from detected to tuned pitch. Grey ball = Doubler: up = more doubled voices, right = wider.");
+    orb.setTooltip ("Live pitch view. Drag the inner orb for Speed, the outer sphere for Amount (double-click resets). Grey ball = Doubler: up = more doubled voices, right = wider (Alt-drag locks an axis).");
     keyboard.setTooltip ("Click a note to allow/forbid it (switches to Custom). Right-click a note to make it the root. With Hold on, a click sets the key.");
     notePill.setTooltip ("Note: pick allowed notes yourself by clicking keys.");
     majorPill.setTooltip ("Major scale on the current root.");

@@ -383,44 +383,81 @@ void Orb::mouseMove (const juce::MouseEvent& e)
 
 void Orb::mouseDown (const juce::MouseEvent& e)
 {
-    if (e.position.getDistanceFrom (handlePos()) > 20.0f * unit())
+    // The grey dot drives the Doubler; the orb body drives Speed (inner) / Amount (outer sphere).
+    if (e.position.getDistanceFrom (handlePos()) <= 20.0f * unit())
+    {
+        dragMode = Drag::Doubler;
+        dragging = true;
+        lockFrom = e.position; lockX = xNorm; lockY = yNorm; // anchor for Alt axis-lock
+        xAttach.beginGesture();
+        yAttach.beginGesture();
+        mouseDrag (e);
         return;
-    dragging = true;
-    lockFrom = e.position; lockX = xNorm; lockY = yNorm; // anchor for Alt axis-lock
-    xAttach.beginGesture();
-    yAttach.beginGesture();
-    mouseDrag (e);
+    }
+    const float d = e.position.getDistanceFrom (centre());
+    if ((speedP || amountP) && d <= kSphereR * unit())
+    {
+        const bool inner = d <= kFieldR * unit();
+        dragMode = inner ? Drag::Speed : Drag::Amount;
+        if (auto* p = inner ? speedP : amountP)
+        {
+            dragStartNorm = p->getValue();
+            dragStart = e.position;
+            p->beginChangeGesture();
+        }
+        return;
+    }
+    dragMode = Drag::None;
 }
 
 void Orb::mouseDrag (const juce::MouseEvent& e)
 {
-    if (! dragging) return;
-    const auto t = trackArea();
-    float nx = juce::jlimit (0.0f, 1.0f, (e.position.x - t.getX()) / t.getWidth());
-    float ny = juce::jlimit (0.0f, 1.0f, (t.getBottom() - e.position.y) / t.getHeight());
-    if (e.mods.isAltDown()) // lock to the axis with the larger movement from the grab point
+    if (dragMode == Drag::Doubler)
     {
-        if (std::abs (e.position.x - lockFrom.x) >= std::abs (e.position.y - lockFrom.y)) ny = lockY;
-        else nx = lockX;
+        const auto t = trackArea();
+        float nx = juce::jlimit (0.0f, 1.0f, (e.position.x - t.getX()) / t.getWidth());
+        float ny = juce::jlimit (0.0f, 1.0f, (t.getBottom() - e.position.y) / t.getHeight());
+        if (e.mods.isAltDown()) // lock to the axis with the larger movement from the grab point
+        {
+            if (std::abs (e.position.x - lockFrom.x) >= std::abs (e.position.y - lockFrom.y)) ny = lockY;
+            else nx = lockX;
+        }
+        xNorm = nx; yNorm = ny;
+        xAttach.setValueAsPartOfGesture (xParam.convertFrom0to1 (xNorm));
+        yAttach.setValueAsPartOfGesture (yParam.convertFrom0to1 (yNorm));
+        repaint();
+        return;
     }
-    xNorm = nx; yNorm = ny;
-    xAttach.setValueAsPartOfGesture (xParam.convertFrom0to1 (xNorm));
-    yAttach.setValueAsPartOfGesture (yParam.convertFrom0to1 (yNorm));
-    repaint();
+    if (dragMode == Drag::Speed || dragMode == Drag::Amount)
+    {
+        if (auto* p = dragMode == Drag::Speed ? speedP : amountP)
+        {
+            const float fine = e.mods.isShiftDown() ? 0.25f : 1.0f;
+            const float dy = (dragStart.y - e.position.y) / (240.0f * unit()) * fine; // up = more
+            p->setValueNotifyingHost (juce::jlimit (0.0f, 1.0f, dragStartNorm + dy));
+        }
+    }
 }
 
 void Orb::mouseUp (const juce::MouseEvent&)
 {
-    if (! dragging) return;
-    dragging = false;
-    xAttach.endGesture();
-    yAttach.endGesture();
+    if (dragMode == Drag::Doubler) { dragging = false; xAttach.endGesture(); yAttach.endGesture(); }
+    else if (dragMode == Drag::Speed && speedP) speedP->endChangeGesture();
+    else if (dragMode == Drag::Amount && amountP) amountP->endChangeGesture();
+    dragMode = Drag::None;
     repaint();
 }
 
 void Orb::mouseDoubleClick (const juce::MouseEvent& e)
 {
-    if (e.position.getDistanceFrom (handlePos()) > 20.0f * unit()) return;
-    xAttach.setValueAsCompleteGesture (xParam.convertFrom0to1 (xParam.getDefaultValue()));
-    yAttach.setValueAsCompleteGesture (yParam.convertFrom0to1 (yParam.getDefaultValue()));
+    if (e.position.getDistanceFrom (handlePos()) <= 20.0f * unit())
+    {
+        xAttach.setValueAsCompleteGesture (xParam.convertFrom0to1 (xParam.getDefaultValue()));
+        yAttach.setValueAsCompleteGesture (yParam.convertFrom0to1 (yParam.getDefaultValue()));
+        return;
+    }
+    const float d = e.position.getDistanceFrom (centre());
+    if (d <= kSphereR * unit())
+        if (auto* p = d <= kFieldR * unit() ? speedP : amountP)
+            p->setValueNotifyingHost (p->getDefaultValue());
 }
