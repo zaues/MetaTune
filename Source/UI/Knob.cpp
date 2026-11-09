@@ -132,10 +132,13 @@ void Knob::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white.withAlpha (0.05f + 0.07f * hv));
     g.drawEllipse (c.x - ri + 0.5f, c.y - ri + 0.5f, 2 * ri - 1, 2 * ri - 1, 1.0f);
 
-    // Readout and label.
-    const float lcdH = style.ticks ? R * 0.22f : R * 0.24f;
-    const float lcdY = style.ticks ? c.y - R * 0.17f : c.y - R * 0.24f;
-    drawSevenSeg (g, format (getValue()), { c.x - ri, lcdY, 2 * ri, lcdH }, style.cells,
+    // Readout and label. The readout digits scale with lcdH; keep them clearly larger than the label.
+    const float lcdH = style.ticks ? R * 0.30f : R * 0.24f;
+    const float lcdY = style.ticks ? c.y - R * 0.21f : c.y - R * 0.24f;
+    const auto readout = format (getValue());
+    drawSevenSeg (g, readout, { c.x - ri, lcdY + 1.8f, 2 * ri, lcdH }, style.cells,      // drop shadow
+                  juce::Colours::black.withAlpha (0.55f), juce::Colours::transparentBlack);
+    drawSevenSeg (g, readout, { c.x - ri, lcdY, 2 * ri, lcdH }, style.cells,
                   text.interpolatedWith (lavender.interpolatedWith (violet, 0.35f), turning.get()), juce::Colours::white.withAlpha (0.05f));
     g.setFont (font (juce::jmax (11.0f, R * (style.ticks ? 0.135f : 0.22f)), true));
     shadowText (g, hot && style.unit.isNotEmpty() ? style.unit : label,
