@@ -6,6 +6,10 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.4.0",
+      "- New: recolour MetaTune! The palette button (top-left) opens a colour panel with Hue, Saturation and Brightness sliders plus a grid of preset swatches, so you can switch the accent from purple to any colour. Your choice is saved." },
+    { "0.3.14",
+      "- New: a 'What's New' popup after updates, plus a Release notes entry in Settings to read it anytime." },
     { "0.3.13",
       "- The Doubler ball now passes BEHIND the Dry/Wet and Doubler labels, which stay fully legible with a brighter look and a stronger shadow.\n"
       "- The Sustain readout is centred, and the Speed value keeps its decimal (20.0)." },

@@ -22,6 +22,7 @@ juce::Path chat();      // speech bubble
 juce::Path grid();      // 2x2 squares (groups)
 juce::Path chevronUp();
 juce::Path chevronDown();
+juce::Path palette();   // three overlapping circles (colour / theme)
 }
 
 // Flat icon button; toggleable buttons light up in the accent colour when on.
@@ -306,6 +307,35 @@ private:
     juce::TextEditor name;
     TextPill saveButton { "Save", TextPill::Kind::Primary }, cancelButton { "Cancel", TextPill::Kind::Plain };
     juce::String message;
+};
+
+// Colour panel: Hue / Saturation / Brightness sliders plus a grid of preset swatches that recolour
+// the plugin's accent palette. Drops down from the header palette button.
+class ColorPanel : public juce::Component
+{
+public:
+    std::function<void (float hue, float sat, float bright)> onChange;
+    std::function<void()> onMouseLeave;
+
+    void setValues (float h, float s, float b) { hue = h; sat = s; bright = b; repaint(); }
+    int preferredHeight() const { return 214; }
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); if (drag < 0 && onMouseLeave) onMouseLeave(); }
+
+    static constexpr int kSwatches = 16;
+
+private:
+    juce::Rectangle<float> barFor (int i) const;      // 0 Hue, 1 Saturation, 2 Brightness
+    juce::Rectangle<float> swatchAt (int i) const;
+    static float swatchHue (int i) { return float (i) / float (kSwatches); }
+    void applyDrag (juce::Point<float>);
+
+    float hue = 0.0f, sat = 1.0f, bright = 1.0f;
+    int drag = -1;
 };
 
 // Full-window "What's New" / release-notes overlay: blurs the UI behind it and shows a scrollable

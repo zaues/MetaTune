@@ -45,6 +45,7 @@ private:
     void refreshPresetPanel();
     void showGroupBrowser (bool show);
     void refreshGroupBrowser();
+    void showColorPanel (bool show);
     void showNotesCard(); // "What's New" overlay
     void showSettingsPanel (bool show);
     void stepPreset (int delta);
@@ -74,6 +75,7 @@ private:
     RootPicker rootPicker;
     PresetPanel presetPanel;
     GroupBrowser groupBrowser;
+    ColorPanel colorPanel;
     SettingsPanel settingsPanel;
     SavePresetCard saveCard;
     ReleaseNotesCard notesCard;
@@ -83,6 +85,7 @@ private:
     TextPill chromaticPill { "Chromatic", TextPill::Kind::Plain }, scalePill { "Scale", TextPill::Kind::Plain };
     ToggleSwitch lowLatency;
 
+    IconButton colorButton { "color", icons::palette() };
     IconButton menuButton { "menu", icons::menu() };
     IconButton saveButton { "save", icons::save() };
     IconButton undoButton { "undo", icons::undo() }, redoButton { "redo", icons::redo() }, resetButton { "reset", icons::loop() };

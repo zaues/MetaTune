@@ -108,6 +108,17 @@ void Settings::setAutoCheck (bool on) { props().setValue ("autoCheck", on); prop
 juce::String Settings::notesVersion() { return props().getValue ("notesVersion"); }
 void Settings::setNotesVersion (const juce::String& v) { props().setValue ("notesVersion", v); props().saveIfNeeded(); }
 
+float Settings::accentHue()    { return (float) props().getDoubleValue ("accentHue", 0.0); }
+float Settings::accentSat()    { return (float) props().getDoubleValue ("accentSat", 1.0); }
+float Settings::accentBright() { return (float) props().getDoubleValue ("accentBright", 1.0); }
+void Settings::setAccentPrefs (float hue, float sat, float bright)
+{
+    props().setValue ("accentHue", hue);
+    props().setValue ("accentSat", sat);
+    props().setValue ("accentBright", bright);
+    props().saveIfNeeded();
+}
+
 std::optional<Release> Settings::cached()
 {
     Release r { props().getValue ("latestVersion"), props().getValue ("latestUrl"), props().getValue ("latestSha256") };

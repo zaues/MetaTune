@@ -3,6 +3,26 @@
 
 namespace theme
 {
+void setAccent (float hue, float saturation, float brightness)
+{
+    accentHue = hue; accentSat = saturation; accentBright = brightness;
+    violet       = recolour (juce::Colour (base::violet));
+    violetDeep   = recolour (juce::Colour (base::violetDeep));
+    pink         = recolour (juce::Colour (base::pink));
+    coral        = recolour (juce::Colour (base::coral));
+    blue         = recolour (juce::Colour (base::blue));
+    cyan         = recolour (juce::Colour (base::cyan));
+    lavender     = recolour (juce::Colour (base::lavender));
+    rose         = recolour (juce::Colour (base::rose));
+    lilac        = recolour (juce::Colour (base::lilac));
+    amber        = recolour (juce::Colour (base::amber));
+    warn         = recolour (juce::Colour (base::warn));
+    keyOnTop     = recolour (juce::Colour (base::keyOnTop));
+    keyOnBottom  = recolour (juce::Colour (base::keyOnBottom));
+    blackOnTop   = recolour (juce::Colour (base::blackOnTop));
+    blackOnBottom = recolour (juce::Colour (base::blackOnBottom));
+}
+
 juce::Font font (float height, bool semibold)
 {
     // Embedded Inter (SIL OFL): identical rendering regardless of fonts present in the Wine prefix.

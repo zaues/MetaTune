@@ -26,18 +26,20 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
       orb (*state.getParameter (ParamID::doublerWidth), *state.getParameter (ParamID::doublerMix), "Doubler\nWidth", "Doubler\nDry / Wet", &p.undoManager),
       stabilizerSeg (*state.getParameter (ParamID::stabilizer), kStabilizerNames, &p.undoManager)
 {
+    theme::setAccent (update::Settings::accentHue(), update::Settings::accentSat(), update::Settings::accentBright());
     setLookAndFeel (&lnf);
     addAndMakeVisible (canvas);
 
     for (auto* c : std::initializer_list<juce::Component*> { &orb, &speedKnob, &sustainKnob, &amountKnob, &keyboard, &refStrip, &toneSlider,
                                                             &stabilizerSeg, &groups, &presetBar, &notePill, &majorPill, &minorPill, &chromaticPill,
-                                                            &scalePill, &lowLatency, &menuButton, &saveButton, &undoButton, &redoButton,
+                                                            &scalePill, &lowLatency, &colorButton, &menuButton, &saveButton, &undoButton, &redoButton,
                                                             &resetButton, &aButton, &copyButton, &bButton, &helpButton, &heatButton,
                                                             &detectedButton, &bypassButton, &chromaticButton })
         canvas.addAndMakeVisible (c);
     canvas.addChildComponent (rootPicker);
     canvas.addChildComponent (presetPanel);
     canvas.addChildComponent (groupBrowser);
+    canvas.addChildComponent (colorPanel);
     canvas.addChildComponent (settingsPanel);
     settingsPanel.onPick = [this] (int id) {
         showSettingsPanel (false);
@@ -140,6 +142,17 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     bButton.onClick = [this] { if (proc.getABSlot() != 1) proc.switchAB(); };
     copyButton.onClick = [this] { proc.copyToOtherAB(); };
     menuButton.onClick = [this] { showSettingsPanel (! settingsPanel.isVisible()); };
+    colorButton.onClick = [this] { showColorPanel (! colorPanel.isVisible()); };
+    colorPanel.onChange = [this] (float h, float s, float b) {
+        theme::setAccent (h, s, b);
+        update::Settings::setAccentPrefs (h, s, b);
+        canvas.repaint();
+    };
+    colorPanel.onMouseLeave = [this] {
+        if (! colorPanel.getLocalBounds().contains (colorPanel.getMouseXYRelative()))
+            showColorPanel (false);
+    };
+    colorButton.setTooltip ("Colour: recolour MetaTune's accent (hue, saturation, brightness) or pick a preset swatch.");
     saveButton.onClick = [this] { savePresetDialog(); };
     presetBar.onClick = [this] { showPresetPanel (! presetPanel.isVisible()); };
     presetBar.onPrev = [this] { stepPreset (-1); };
@@ -230,6 +243,7 @@ MetaTuneEditor::~MetaTuneEditor()
     animator.cancelAnimation (&rootPicker, false);
     animator.cancelAnimation (&presetPanel, false);
     animator.cancelAnimation (&groupBrowser, false);
+    animator.cancelAnimation (&colorPanel, false);
     animator.cancelAnimation (&settingsPanel, false);
     canvas.removeMouseListener (this);
     proc.toneNote = -1; // closing the window while a key is held must not leave the tone on
@@ -264,6 +278,7 @@ void MetaTuneEditor::layout()
 {
     using namespace layout;
     // Header.
+    colorButton.setBounds (6, 6, 46, 40);
     menuButton.setBounds (60, 6, 46, 40);
     presetBar.setBounds (113, 0, 229, headerH);
     saveButton.setBounds (346, 6, 50, 40);
@@ -318,14 +333,10 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     g.setColour (headerBox);
     g.fillRect (342, 0, 58, headerH);
     {
-        // Logo tile: a menu mark.
+        // Tile behind the colour (palette) button.
         const auto tile = juce::Rectangle<float> (8, 8, 36, 36);
         g.setGradientFill (juce::ColourGradient (juce::Colour (0xff4a4a4e), tile.getX(), tile.getY(), juce::Colour (0xff2c2c2f), tile.getX(), tile.getBottom(), false));
         g.fillRoundedRectangle (tile, 5.0f);
-        g.setColour (text.withAlpha (0.85f));
-        auto bars = icons::menu();
-        g.strokePath (bars, juce::PathStrokeType (1.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
-                      bars.getTransformToScaleToFit (tile.reduced (9.0f, 8.0f), true));
     }
     {
         // Title cell: dark nebula behind the wordmark.
@@ -757,6 +768,8 @@ void MetaTuneEditor::mouseDown (const juce::MouseEvent& e)
         showSettingsPanel (false);
     if (groupBrowser.isVisible() && e.eventComponent != &groupBrowser && e.eventComponent != &groups)
         showGroupBrowser (false);
+    if (colorPanel.isVisible() && e.eventComponent != &colorPanel && e.eventComponent != &colorButton)
+        showColorPanel (false);
     if (! rootPicker.isVisible() || e.eventComponent == &rootPicker || rootPicker.isParentOf (e.eventComponent))
         return;
     const auto p = canvas.getLocalPoint (e.eventComponent, e.getPosition());
@@ -793,6 +806,31 @@ void MetaTuneEditor::applyPickedScale (int index)
         setParam (ParamID::note (i), on[i] ? 1.0f : 0.0f);
     setParam (ParamID::scale, float (metatune::ScaleType::Custom));
     proc.ui.scaleLabel = name;
+}
+
+void MetaTuneEditor::showColorPanel (bool show)
+{
+    auto& animator = juce::Desktop::getInstance().getAnimator();
+    if (show == colorPanel.isVisible() && ! animator.isAnimating (&colorPanel))
+        return;
+    const int w = 268, h = colorPanel.preferredHeight();
+    const juce::Rectangle<int> open (6, layout::headerH + 2, w, h), tucked = open.translated (0, -12);
+    if (show)
+    {
+        colorPanel.setValues (update::Settings::accentHue(), update::Settings::accentSat(), update::Settings::accentBright());
+        showSettingsPanel (false);
+        showPresetPanel (false);
+        colorPanel.setBounds (tucked);
+        colorPanel.setAlpha (0.0f);
+        colorPanel.setVisible (true);
+        colorPanel.toFront (false);
+        animator.animateComponent (&colorPanel, open, 1.0f, 170, false, 0.0, 0.0);
+    }
+    else
+    {
+        animator.animateComponent (&colorPanel, tucked, 0.0f, 130, true, 1.0, 1.0);
+        colorPanel.setVisible (false);
+    }
 }
 
 void MetaTuneEditor::showSettingsPanel (bool show)

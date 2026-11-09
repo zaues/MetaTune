@@ -41,6 +41,11 @@ struct Settings
     // The plugin version whose "What's New" notes were last shown (global, so it pops up once per update).
     static juce::String notesVersion();
     static void setNotesVersion (const juce::String&);
+    // Accent theme (global): hue rotation 0..1, saturation and brightness multipliers.
+    static float accentHue();
+    static float accentSat();
+    static float accentBright();
+    static void setAccentPrefs (float hue, float sat, float bright);
 };
 
 // Copies the updater to %TEMP% (the installer replaces the original while it runs) and starts it

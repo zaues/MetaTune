@@ -112,6 +112,14 @@ juce::Path grid()
 }
 juce::Path chevronUp() { juce::Path p; p.startNewSubPath (6, 15); p.lineTo (12, 9); p.lineTo (18, 15); return p; }
 juce::Path chevronDown() { juce::Path p; p.startNewSubPath (6, 9); p.lineTo (12, 15); p.lineTo (18, 9); return p; }
+juce::Path palette()
+{
+    juce::Path p;
+    p.addEllipse (3.0f, 8.5f, 8.5f, 8.5f);
+    p.addEllipse (7.5f, 4.0f, 8.5f, 8.5f);
+    p.addEllipse (12.0f, 8.5f, 8.5f, 8.5f);
+    return p;
+}
 } // namespace icons
 
 static void strokeIcon (juce::Graphics& g, const juce::Path& icon, juce::Rectangle<float> area, float thickness = 1.7f)
@@ -1244,3 +1252,98 @@ void ReleaseNotesCard::mouseWheelMove (const juce::MouseEvent& e, const juce::Mo
     scroll = juce::jlimit (0.0f, maxS, scroll - w.deltaY * 120.0f);
     repaint();
 }
+
+// ---- ColorPanel
+
+static constexpr float kSatMin = 0.4f, kSatMax = 1.6f, kBriMin = 0.6f, kBriMax = 1.3f;
+
+juce::Rectangle<float> ColorPanel::barFor (int i) const
+{
+    return { 66.0f, 16.0f + float (i) * 30.0f, float (getWidth()) - 66.0f - 14.0f, 10.0f };
+}
+
+juce::Rectangle<float> ColorPanel::swatchAt (int i) const
+{
+    const int cols = 8;
+    const float gap = 6.0f, sw = (float (getWidth()) - 28.0f - gap * float (cols - 1)) / float (cols);
+    const int col = i % cols, row = i / cols;
+    return { 14.0f + float (col) * (sw + gap), 118.0f + float (row) * (sw + gap), sw, sw };
+}
+
+void ColorPanel::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto b = getLocalBounds().toFloat();
+    juce::Path bg;
+    bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), 8.0f, 8.0f, false, false, true, true);
+    juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 16, { 0, 4 }).drawForPath (g, bg);
+    g.setColour (juce::Colour (0xff1c1c1e)); g.fillPath (bg);
+    g.setColour (juce::Colours::white.withAlpha (0.07f)); g.strokePath (bg, juce::PathStrokeType (1.0f));
+
+    const char* names[] = { "Hue", "Saturation", "Bright" };
+    const float frac[] = { hue, (sat - kSatMin) / (kSatMax - kSatMin), (bright - kBriMin) / (kBriMax - kBriMin) };
+    for (int i = 0; i < 3; ++i)
+    {
+        const auto bar = barFor (i);
+        g.setFont (font (12.0f, true));
+        shadowText (g, names[i], juce::Rectangle<float> (12.0f, bar.getCentreY() - 9.0f, 52.0f, 18.0f), juce::Justification::centredLeft, textDim);
+        if (i == 0)
+        {
+            juce::ColourGradient grad (juce::Colour::fromHSV (0.0f, 0.8f, 1.0f, 1.0f), bar.getX(), 0.0f,
+                                       juce::Colour::fromHSV (1.0f, 0.8f, 1.0f, 1.0f), bar.getRight(), 0.0f, false);
+            for (float t = 0.125f; t < 1.0f; t += 0.125f) grad.addColour (t, juce::Colour::fromHSV (t, 0.8f, 1.0f, 1.0f));
+            g.setGradientFill (grad);
+        }
+        else if (i == 1)
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff6b6b70), bar.getX(), 0.0f,
+                                                     juce::Colour (theme::base::violet).withRotatedHue (hue), bar.getRight(), 0.0f, false));
+        else
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black, bar.getX(), 0.0f, juce::Colours::white, bar.getRight(), 0.0f, false));
+        g.fillRoundedRectangle (bar, bar.getHeight() * 0.5f);
+        const float hx = bar.getX() + juce::jlimit (0.0f, 1.0f, frac[i]) * bar.getWidth();
+        g.setColour (juce::Colours::white);
+        g.fillEllipse (hx - 6.0f, bar.getCentreY() - 6.0f, 12.0f, 12.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.drawEllipse (hx - 6.0f, bar.getCentreY() - 6.0f, 12.0f, 12.0f, 1.0f);
+    }
+
+    const auto mouse = getMouseXYRelative().toFloat();
+    for (int i = 0; i < kSwatches; ++i)
+    {
+        const auto s = swatchAt (i);
+        g.setColour (juce::Colour (theme::base::violet).withRotatedHue (swatchHue (i)));
+        g.fillRoundedRectangle (s, 5.0f);
+        const bool sel = std::abs (hue - swatchHue (i)) < 0.5f / float (kSwatches);
+        g.setColour (juce::Colours::white.withAlpha (sel ? 0.95f : (s.contains (mouse) ? 0.55f : 0.14f)));
+        g.drawRoundedRectangle (s.reduced (0.5f), 5.0f, sel ? 2.0f : 1.0f);
+    }
+}
+
+void ColorPanel::applyDrag (juce::Point<float> p)
+{
+    const auto bar = barFor (drag);
+    const float t = juce::jlimit (0.0f, 1.0f, (p.x - bar.getX()) / bar.getWidth());
+    if (drag == 0) hue = t;
+    else if (drag == 1) sat = kSatMin + t * (kSatMax - kSatMin);
+    else bright = kBriMin + t * (kBriMax - kBriMin);
+    if (onChange) onChange (hue, sat, bright);
+    repaint();
+}
+
+void ColorPanel::mouseDown (const juce::MouseEvent& e)
+{
+    drag = -1;
+    for (int i = 0; i < 3; ++i)
+        if (barFor (i).expanded (6.0f, 9.0f).contains (e.position)) { drag = i; applyDrag (e.position); return; }
+    for (int i = 0; i < kSwatches; ++i)
+        if (swatchAt (i).contains (e.position))
+        {
+            hue = swatchHue (i); sat = 1.0f; bright = 1.0f;
+            if (onChange) onChange (hue, sat, bright);
+            repaint();
+            return;
+        }
+}
+
+void ColorPanel::mouseDrag (const juce::MouseEvent& e) { if (drag >= 0) applyDrag (e.position); }
+void ColorPanel::mouseUp (const juce::MouseEvent&) { drag = -1; }
