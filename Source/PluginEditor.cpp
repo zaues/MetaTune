@@ -165,6 +165,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     copyButton.onClick = [this] { proc.copyToOtherAB(); };
     menuButton.onClick = [this] { showSettingsPanel (! settingsPanel.isVisible()); };
     colorButton.onClick = [this] { showColorPanel (! colorPanel.isVisible()); };
+    colorButton.iconScale = 0.5f; // a touch smaller so the palette icon has margin inside its tile
     colorPanel.onChange = [this] (float h, float s, float b) {
         theme::setGradient (false, theme::gradA, theme::gradB); // a solid accent cancels the gradient
         theme::setAccent (h, s, b);
@@ -193,7 +194,8 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     };
     colorButton.setTooltip ("Colour: recolour MetaTune's accent (hue, saturation, brightness) or pick a preset swatch.");
     saveButton.onClick = [this] { savePresetDialog(); };
-    presetBar.onClick = [this] { showBrowser (! browserTabs.isVisible() || browserTabs.getTab() != 0, 0); };
+    // The header preset box opens a presets-only list (no Groups tab); the grid/box icon opens the tabbed browser.
+    presetBar.onClick = [this] { showPresetPanel (browserTabs.isVisible() || ! presetPanel.isVisible()); };
     presetBar.onPrev = [this] { stepPreset (-1); };
     presetBar.onNext = [this] { stepPreset (+1); };
 
@@ -314,7 +316,7 @@ void MetaTuneEditor::layout()
 {
     using namespace layout;
     // Header.
-    colorButton.setBounds (6, 6, 46, 40);
+    colorButton.setBounds (7, 7, 38, 38);
     menuButton.setBounds (60, 6, 46, 40);
     presetBar.setBounds (113, 0, 229, headerH);
     saveButton.setBounds (346, 6, 50, 40);
@@ -370,7 +372,7 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     g.fillRect (342, 0, 58, headerH);
     {
         // Tile behind the colour (palette) button.
-        const auto tile = juce::Rectangle<float> (8, 8, 36, 36);
+        const auto tile = juce::Rectangle<float> (6, 7, 40, 38);
         g.setGradientFill (lightMode
             ? juce::ColourGradient (bg3.brighter (0.25f), tile.getX(), tile.getY(), bg3.darker (0.06f), tile.getX(), tile.getBottom(), false)
             : juce::ColourGradient (juce::Colour (0xff4a4a4e), tile.getX(), tile.getY(), juce::Colour (0xff2c2c2f), tile.getX(), tile.getBottom(), false));
@@ -481,16 +483,16 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     shadowText (g, "Select", juce::Rectangle<float> (24.0f, float (rowY), 60.0f, float (rowH)), juce::Justification::centredLeft, textDim);
     g.setColour (textDim);
     g.fillRect (96, rowY + rowH / 2, 20, 1);
-    g.setColour (juce::Colour (0xff2a2a2d));
+    g.setColour (bg3);
     g.fillRoundedRectangle (233.0f, float (rowY + 8), 278.0f, 32.0f, 16.0f);
     {
         const auto box = juce::Rectangle<float> (540.0f, float (rowY + 5), 406.0f, 38.0f);
-        g.setColour (juce::Colour (0xff0e0e0f));
+        g.setColour (bg0);
         g.fillRoundedRectangle (box, 19.0f);
         g.setColour (juce::Colours::white.withAlpha (0.07f));
         g.drawRoundedRectangle (box.reduced (0.5f), 19.0f, 1.0f);
         const auto lbl = juce::Rectangle<float> (822.0f, float (rowY + 9), 120.0f, 30.0f);
-        g.setColour (juce::Colour (0xff2c2c2f));
+        g.setColour (bg3);
         g.fillRoundedRectangle (lbl, 15.0f);
         g.setFont (font (14.0f, true));
         shadowText (g, "Note Transition", lbl, juce::Justification::centred, text.withAlpha (0.9f));
@@ -499,7 +501,7 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     shadowFittedText (g, "Low\nLatency", juce::Rectangle<int> (1010, rowY + 4, 68, rowH - 8), juce::Justification::centredLeft, 2, e.lowLatency.getToggleState() ? text : greyText);
 
     // Bottom side columns.
-    g.setColour (juce::Colour (0xff1a1a1b));
+    g.setColour (bg2);
     g.fillRect (0, bottomY, leftW, kH - bottomY);
     g.fillRect (rightX, bottomY, kW - rightX, kH - bottomY);
     g.setColour (juce::Colours::black.withAlpha (0.6f));
@@ -530,7 +532,7 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     {
         // First run only (no key ever picked): a mouse cursor and a prompt instead of a key.
         const auto area = e.rootArea.withHeight (100).toFloat();
-        const juce::Colour promptCol (0xffc8c6d2); // grey-white, to match the prompt text
+        const juce::Colour promptCol = textDim.interpolatedWith (text, 0.4f); // adapts to the theme
         juce::Path cur;
         cur.startNewSubPath (0.0f, 0.0f);
         cur.lineTo (0.0f, 16.0f);
@@ -570,7 +572,7 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     // Chromatic tab.
     juce::Path tab;
     tab.addRoundedRectangle (0.0f, 826.0f, float (leftW), 30.0f, 12.0f, 12.0f, false, true, false, false);
-    g.setColour (juce::Colour (0xff252527));
+    g.setColour (bg3);
     g.fillPath (tab);
 }
 
@@ -804,6 +806,11 @@ void MetaTuneEditor::mouseDown (const juce::MouseEvent& e)
         && e.eventComponent != &browserTabs && e.eventComponent != &presetBar && e.eventComponent != &groups
         && ! presetPanel.isParentOf (e.eventComponent) && ! groupBrowser.isParentOf (e.eventComponent))
         showBrowser (false);
+    // Standalone presets-only panel (opened from the header preset box): close it on an outside click.
+    if (presetPanel.isVisible() && ! browserTabs.isVisible()
+        && e.eventComponent != &presetPanel && e.eventComponent != &presetBar
+        && ! presetPanel.isParentOf (e.eventComponent))
+        showPresetPanel (false);
     if (settingsPanel.isVisible() && e.eventComponent != &settingsPanel && e.eventComponent != &menuButton)
         showSettingsPanel (false);
     if (colorPanel.isVisible() && e.eventComponent != &colorPanel && e.eventComponent != &colorButton)
@@ -1034,6 +1041,11 @@ void MetaTuneEditor::showPresetPanel (bool show)
     const juce::Rectangle<int> open (113, layout::headerH + 2, 287, h), tucked = open.translated (0, -12);
     if (show)
     {
+        showSettingsPanel (false);
+        showColorPanel (false);
+        browserTabs.setVisible (false);   // presets-only: no Groups tab
+        groupBrowser.setVisible (false);
+        groups.setBrowseActive (false);
         presetPanel.setBounds (tucked);
         presetPanel.setAlpha (0.0f);
         presetPanel.setVisible (true);

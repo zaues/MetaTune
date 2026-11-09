@@ -88,7 +88,7 @@ void KeyboardPanel::paint (juce::Graphics& g)
 {
     using namespace theme;
     const float W = float (getWidth());
-    g.fillAll (juce::Colour (0xff111112));
+    g.fillAll (bg1);
 
     if (showHeat)
     {
@@ -108,8 +108,8 @@ void KeyboardPanel::paint (juce::Graphics& g)
         auto r = juce::Rectangle<float> (cell * float (pc), lr.getY(), cell, lr.getHeight()).reduced (1.0f, 0.0f);
         const bool on = metatune::isAllowed (mask, pc);
         // Allowed notes: lighter cell with a lavender line at the bottom; forbidden notes recede.
-        if (isBlack (pc)) g.setColour (on ? juce::Colour (0xff232325) : labelBlack);
-        else              g.setColour (on ? labelWhite.brighter (0.12f) : juce::Colour (0xff3a3a3d));
+        if (isBlack (pc)) g.setColour (on ? bg3 : labelBlack);
+        else              g.setColour (on ? labelWhite.brighter (0.12f) : bg3.darker (0.15f));
         g.fillRect (r);
         if (pc == detectedPc && showDetected) // detected input note: the whole label lights up
         {

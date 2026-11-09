@@ -6,6 +6,11 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.5.1",
+      "- Light mode now covers the whole interface: the side columns, keyboard, note labels and bottom bars all go light.\n"
+      "- The header preset box opens a presets-only list; the grid/box icon still opens the tabbed Presets + Groups browser.\n"
+      "- The Doubler guide lines are rounded, stop short of the axis labels, and light up white when you hover the line itself (not just the handle).\n"
+      "- More breathing room around the palette (colour) button icon." },
     { "0.5.0",
       "- Light mode: a full light theme. Toggle it from the colour panel (the palette button).\n"
       "- Gradient accent: pick two colours and MetaTune blends them across the orb, meters and keys.\n"

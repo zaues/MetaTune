@@ -75,9 +75,16 @@ juce::Point<float> Orb::handlePos() const
 
 bool Orb::hitTest (int x, int y)
 {
-    // Only the sphere and the handle take the mouse: the empty stage lets clicks through.
+    // The sphere, the handle and the two Doubler guide lines take the mouse; the rest of the stage lets clicks through.
     const juce::Point<float> p { float (x), float (y) };
-    return p.getDistanceFrom (centre()) < (kSphereR + 4.0f) * unit() || p.getDistanceFrom (handlePos()) < 20.0f * unit();
+    const float U = unit();
+    if (p.getDistanceFrom (centre()) < (kSphereR + 4.0f) * U || p.getDistanceFrom (handlePos()) < 20.0f * U)
+        return true;
+    const auto pad = padArea();
+    const float x0 = pad.getX(), y1 = pad.getBottom(), yTop = pad.getY() + 36.0f, xEnd = pad.getRight() - 30.0f, tol = 7.0f * U;
+    const bool onV = std::abs (p.x - x0) < tol && p.y > yTop && p.y < y1 + tol;
+    const bool onH = std::abs (p.y - y1) < tol && p.x > x0 - tol && p.x < xEnd;
+    return onV || onH;
 }
 
 juce::Path Orb::coreContour (juce::Point<float> c, float radius) const
@@ -331,26 +338,33 @@ void Orb::paint (juce::Graphics& g)
     }
 
 
-    // Doubler guides: an L of axis lines with markers that follow the ball.
+    // Doubler guides: an L of rounded axis lines, always faintly visible, that light up white when the ball
+    // or the line itself is hovered. Each line stops short of its end (a gap by the axis label).
     const auto hp = handlePos();
-    guide.setTarget (dragging || hoverHandle ? 1.0f : 0.0f);
-    if (const float ga = guide; ga > 0.0f)
+    guide.setTarget (dragging || hoverHandle || hoverLine >= 0 ? 1.0f : 0.0f);
     {
         const auto pad = padArea();
+        const float U = unit();
         const float x0 = pad.getX(), y1 = pad.getBottom(), yTop = pad.getY() + 36.0f, xEnd = pad.getRight() - 30.0f;
-        g.setColour (juce::Colours::white.withAlpha (0.35f * ga));
-        g.drawLine (x0, yTop, x0, y1, 1.5f);
-        g.drawLine (x0, y1, xEnd, y1, 1.5f);
-        g.setColour (juce::Colours::white.withAlpha (0.8f * ga));
-        g.fillEllipse (x0 - 3.5f, hp.y - 3.5f, 7.0f, 7.0f);
-        g.fillEllipse (hp.x - 3.5f, y1 - 3.5f, 7.0f, 7.0f);
+        const float gap = 16.0f * U, lw = 2.0f * U, ga = guide.get();
+        auto lineCol = [&] (bool hot) { return juce::Colours::white.withAlpha (hot ? 0.95f : 0.14f + 0.42f * ga); };
+        juce::Path v;  v.startNewSubPath (x0, yTop + gap);      v.lineTo (x0, y1);            // Dry / Wet (vertical)
+        g.setColour (lineCol (hoverLine == 0));
+        g.strokePath (v, juce::PathStrokeType (lw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        juce::Path hgl; hgl.startNewSubPath (x0, y1);          hgl.lineTo (xEnd - gap, y1);  // Width (horizontal)
+        g.setColour (lineCol (hoverLine == 1));
+        g.strokePath (hgl, juce::PathStrokeType (lw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        if (ga > 0.01f) // markers that track the ball along each axis
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.8f * ga));
+            g.fillEllipse (x0 - 3.5f * U, hp.y - 3.5f * U, 7.0f * U, 7.0f * U);
+            g.fillEllipse (hp.x - 3.5f * U, y1 - 3.5f * U, 7.0f * U, 7.0f * U);
+        }
     }
 
-    // XY handle. A circular guide ring ("the line") sits around the ball; on hover/drag the ring lights
-    // up white and the ball reads concentric white centre / black / white.
+    // XY handle. On hover/drag the ball reads concentric white centre / black / white.
     const float ga = guide.get();
     const float hr = (15.0f + 1.5f * ga) * U;
-    const float ringR = hr + 5.0f * U;
     juce::Path hpath;
     hpath.addEllipse (hp.x - hr, hp.y - hr, 2 * hr, 2 * hr);
     juce::DropShadow (juce::Colours::black.withAlpha (0.7f), int (10 * U), { 0, int (3 * U) }).drawForPath (g, hpath);
@@ -376,9 +390,6 @@ void Orb::paint (juce::Graphics& g)
         g.setColour (juce::Colours::white.withAlpha (0.12f));
         g.strokePath (hpath, juce::PathStrokeType (1.0f));
     }
-    // The circular guide ring around the ball.
-    g.setColour (juce::Colours::white.withAlpha (0.16f + 0.64f * ga));
-    g.drawEllipse (hp.x - ringR, hp.y - ringR, 2 * ringR, 2 * ringR, 1.2f + 0.8f * ga);
 
     // Doubler axis labels, drawn on top of the ball so it passes behind the text instead of over it.
     if (const float ga = guide; ga > 0.0f)
@@ -406,8 +417,17 @@ void Orb::paint (juce::Graphics& g)
 
 void Orb::mouseMove (const juce::MouseEvent& e)
 {
-    const bool h = e.position.getDistanceFrom (handlePos()) < 20.0f * unit();
-    if (h != hoverHandle) { hoverHandle = h; repaint(); }
+    const float U = unit();
+    const bool h = e.position.getDistanceFrom (handlePos()) < 20.0f * U;
+    const auto pad = padArea();
+    const float x0 = pad.getX(), y1 = pad.getBottom(), yTop = pad.getY() + 36.0f, xEnd = pad.getRight() - 30.0f, tol = 7.0f * U;
+    int hl = -1;
+    if (! h)
+    {
+        if (std::abs (e.position.x - x0) < tol && e.position.y > yTop && e.position.y < y1) hl = 0;
+        else if (std::abs (e.position.y - y1) < tol && e.position.x > x0 && e.position.x < xEnd) hl = 1;
+    }
+    if (h != hoverHandle || hl != hoverLine) { hoverHandle = h; hoverLine = hl; repaint(); }
     setMouseCursor (h ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor);
 }
 

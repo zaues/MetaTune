@@ -50,11 +50,11 @@ inline juce::Colour warn { 0xffffb35c };
 
 // Keyboard. Allowed keys glow in the accent colour; forbidden keys are plain grey/black.
 inline juce::Colour keyOnTop { 0xff8a78e2 }, keyOnBottom { 0xffb3a4f8 };
-inline const juce::Colour keyOffTop { 0xff8b8b8e }, keyOffBottom { 0xff7c7c80 };
+inline juce::Colour keyOffTop { 0xff8b8b8e }, keyOffBottom { 0xff7c7c80 };   // mutable: lighten in light mode
 inline juce::Colour blackOnTop { 0xff35304a }, blackOnBottom { 0xff5f5192 };
-inline const juce::Colour blackOff { 0xff262628 };
-inline const juce::Colour labelWhite { 0xff5d5d60 }, labelBlack { 0xff19191a };
-inline const juce::Colour greyText { 0xff7d808a };                          // inactive text in the key drawer
+inline juce::Colour blackOff { 0xff262628 };
+inline juce::Colour labelWhite { 0xff5d5d60 }, labelBlack { 0xff19191a };
+inline juce::Colour greyText { 0xff7d808a };                                // inactive text in the key drawer
 
 namespace base // immutable originals the accent palette is derived from
 {

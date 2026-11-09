@@ -57,6 +57,8 @@ void setTheme (bool light)
         highlight = juce::Colour (0xfff4f6fa); panel = juce::Colour (0xffe0e3e9); knobBody = juce::Colour (0xffe8eaee);
         menuBg = juce::Colour (0xfff5f6f9); menuBg2 = juce::Colour (0xffe4e6ea); menuSel = juce::Colour (0xffdcdee5);
         menuTab = juce::Colour (0xffe9ebf0); well = juce::Colour (0xffd8dae1);
+        keyOffTop = juce::Colour (0xffc3c5cc); keyOffBottom = juce::Colour (0xffb0b2ba); blackOff = juce::Colour (0xff6c6e76);
+        labelWhite = juce::Colour (0xff888a92); labelBlack = juce::Colour (0xff4a4c54); greyText = juce::Colour (0xff86888f);
     }
     else
     {
@@ -67,6 +69,8 @@ void setTheme (bool light)
         highlight = juce::Colour (0xff1e2026); panel = juce::Colour (0xff1e2026); knobBody = juce::Colour (0xff18191c);
         menuBg = juce::Colour (0xff1c1c1e); menuBg2 = juce::Colour (0xff121213); menuSel = juce::Colour (0xff252528);
         menuTab = juce::Colour (0xff232327); well = juce::Colour (0xff141416);
+        keyOffTop = juce::Colour (0xff8b8b8e); keyOffBottom = juce::Colour (0xff7c7c80); blackOff = juce::Colour (0xff262628);
+        labelWhite = juce::Colour (0xff5d5d60); labelBlack = juce::Colour (0xff19191a); greyText = juce::Colour (0xff7d808a);
     }
 }
 

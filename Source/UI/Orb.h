@@ -25,7 +25,7 @@ public:
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override;
-    void mouseExit (const juce::MouseEvent&) override { hoverHandle = false; repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { hoverHandle = false; hoverLine = -1; repaint(); }
     void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
@@ -45,6 +45,7 @@ private:
     juce::ParameterAttachment xAttach, yAttach;
     float xNorm = 0, yNorm = 0;
     bool dragging = false, hoverHandle = false, bypassed = false;
+    int hoverLine = -1; // which Doubler guide line the pointer is over: -1 none, 0 vertical (Dry/Wet), 1 horizontal (Width)
     juce::Point<float> lockFrom; float lockX = 0, lockY = 0; // Alt-drag: anchor to lock one Doubler axis
     DisplayState state;
     juce::Image sphere, core; // static artwork, rendered once per size
