@@ -60,10 +60,10 @@ juce::Rectangle<float> Orb::padArea() const
 
 juce::Rectangle<float> Orb::trackArea() const
 {
-    // The handle travels exactly between the drawn guide lines: vertical line top (room for the
-    // Dry/Wet label) down to the baseline, and the baseline across to the horizontal line's end.
+    // The handle travels inside the guide lines but stops short of the axis labels, so the ball never
+    // covers the Dry/Wet text (top) or the Doubler text (right); the labels stay fully visible.
     const auto pad = padArea();
-    const float top = pad.getY() + 36.0f, right = pad.getRight() - 30.0f;
+    const float top = pad.getY() + 56.0f, right = pad.getRight() - 70.0f;
     return { pad.getX(), top, right - pad.getX(), pad.getBottom() - top };
 }
 
@@ -345,13 +345,11 @@ void Orb::paint (juce::Graphics& g)
         g.fillEllipse (x0 - 3.5f, hp.y - 3.5f, 7.0f, 7.0f);
         g.fillEllipse (hp.x - 3.5f, y1 - 3.5f, 7.0f, 7.0f);
         g.setFont (font (12.0f, true));
-        // Fade each axis label out as the ball nears it, so the handle never sits on top of the text.
-        const float yFade = juce::jlimit (0.0f, 1.0f, (0.78f - yNorm) / 0.18f); // Dry/Wet is at the top
-        const float xFade = juce::jlimit (0.0f, 1.0f, (0.74f - xNorm) / 0.18f); // Doubler is at the right
+        // Labels stay fully visible; the ball is constrained (trackArea) so it never reaches them.
         // Left-aligned from just before the axis line so the label never runs off the component's left edge.
         shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 34.0f, 110.0f, 30.0f),
-                          juce::Justification::centredLeft, 2, textDim.withAlpha (ga * yFade));
-        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 45.0f, y1 + 2.0f, 90.0f, 30.0f), juce::Justification::centred, 2, textDim.withAlpha (ga * xFade));
+                          juce::Justification::centredLeft, 2, textDim.withAlpha (ga));
+        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 45.0f, y1 + 2.0f, 90.0f, 30.0f), juce::Justification::centred, 2, textDim.withAlpha (ga));
     }
 
     // XY handle: grey ball.
