@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(MetaTune VERSION 0.4.0 LANGUAGES C CXX)
+project(MetaTune VERSION 0.4.1 LANGUAGES C CXX)
 
 # Product naming lives here only; DSP code never refers to it.
 set(PRODUCT_NAME "MetaTune" CACHE STRING "User-visible plugin name")

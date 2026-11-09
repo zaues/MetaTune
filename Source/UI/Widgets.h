@@ -201,6 +201,23 @@ private:
     theme::Anim& cellAnim (int i);
 };
 
+// Two-tab header ("Presets" / "Groups") for the browser opened from the group box icon.
+class BrowserTabs : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    std::function<void (int)> onSelect;
+    void setTab (int t) { if (t != tab) { tab = t; repaint(); } }
+    int getTab() const noexcept { return tab; }
+    void paint (juce::Graphics&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+
+private:
+    juce::Rectangle<float> tabRect (int i) const;
+    int tab = 0;
+};
+
 // One preset as the panel sees it (folder "" = root / factory).
 struct PresetItem { juce::String name, folder; bool factory = false; };
 

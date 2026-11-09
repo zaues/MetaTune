@@ -6,6 +6,9 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.4.1",
+      "- The box icon above the group tabs now opens a tabbed browser with both Presets and Groups, so you can reach your presets from there too.\n"
+      "- More space between the Doubler Dry/Wet label and its guide line." },
     { "0.4.0",
       "- New: recolour MetaTune! The palette button (top-left) opens a colour panel with Hue, Saturation and Brightness sliders plus a grid of preset swatches, so you can switch the accent from purple to any colour. Your choice is saved." },
     { "0.3.14",

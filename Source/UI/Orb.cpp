@@ -363,7 +363,7 @@ void Orb::paint (juce::Graphics& g)
         const float x0 = pad.getX(), y1 = pad.getBottom(), yTop = pad.getY() + 36.0f, xEnd = pad.getRight() - 30.0f;
         g.setFont (font (12.0f, true));
         // Brighter text with a strong shadow so it stays legible when the grey ball slides behind it.
-        shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 34.0f, 110.0f, 30.0f),
+        shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 46.0f, 110.0f, 30.0f),
                           juce::Justification::centredLeft, 2, text.withAlpha (ga), 1.0f);
         shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 45.0f, y1 + 2.0f, 90.0f, 30.0f), juce::Justification::centred, 2, text.withAlpha (ga), 1.0f);
     }

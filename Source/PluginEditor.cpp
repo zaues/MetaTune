@@ -39,7 +39,9 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     canvas.addChildComponent (rootPicker);
     canvas.addChildComponent (presetPanel);
     canvas.addChildComponent (groupBrowser);
+    canvas.addChildComponent (browserTabs);
     canvas.addChildComponent (colorPanel);
+    browserTabs.onSelect = [this] (int t) { showBrowser (true, t); };
     canvas.addChildComponent (settingsPanel);
     settingsPanel.onPick = [this] (int id) {
         showSettingsPanel (false);
@@ -75,23 +77,20 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
         if (ok) saveCard.setVisible (false);
         else saveCard.open ({}, folder ? "Could not create the folder" : "Could not save the preset");
     };
-    presetPanel.onLoad = [this] (int i) { proc.loadPreset (i); showPresetPanel (false); };
-    presetPanel.onNewPreset = [this] { showPresetPanel (false); pendingSave = PendingSave::Preset; pendingFolder = {}; saveCard.open (proc.ui.presetName); };
-    presetPanel.onSaveToFolder = [this] (const juce::String& f) { showPresetPanel (false); pendingSave = PendingSave::Preset; pendingFolder = f; saveCard.open (proc.ui.presetName); };
-    presetPanel.onNewFolder = [this] { showPresetPanel (false); pendingSave = PendingSave::Folder; pendingFolder = {}; saveCard.open ({}); };
+    presetPanel.onLoad = [this] (int i) { proc.loadPreset (i); showBrowser (false); };
+    presetPanel.onNewPreset = [this] { showBrowser (false); pendingSave = PendingSave::Preset; pendingFolder = {}; saveCard.open (proc.ui.presetName); };
+    presetPanel.onSaveToFolder = [this] (const juce::String& f) { showBrowser (false); pendingSave = PendingSave::Preset; pendingFolder = f; saveCard.open (proc.ui.presetName); };
+    presetPanel.onNewFolder = [this] { showBrowser (false); pendingSave = PendingSave::Folder; pendingFolder = {}; saveCard.open ({}); };
     presetPanel.onDelete = [this] (int i) { proc.deletePreset (i); refreshPresetPanel(); };
     presetPanel.onDeleteFolder = [this] (const juce::String& f) { proc.deleteFolder (f); refreshPresetPanel(); };
     presetPanel.onMove = [this] (int i, const juce::String& f) { proc.movePreset (i, f); refreshPresetPanel(); };
     presetPanel.onOpenFolder = [this] {
-        showPresetPanel (false);
+        showBrowser (false);
         const auto folder = MetaTuneProcessor::presetFolder();
         folder.createDirectory();
         folder.startAsProcess();
     };
-    presetPanel.onMouseLeave = [this] {
-        if (! presetPanel.getLocalBounds().contains (presetPanel.getMouseXYRelative()))
-            showPresetPanel (false);
-    };
+    presetPanel.onMouseLeave = nullptr; // the tabbed browser closes on a click outside, not on mouse-leave
     canvas.addMouseListener (this, true);
     rootPicker.onRoot = [this] (int pc) { pickerPinned = false; setRoot (pc); };
     rootPicker.onScale = [this] (int i) { pickerPinned = false; applyPickedScale (i); };
@@ -154,7 +153,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     };
     colorButton.setTooltip ("Colour: recolour MetaTune's accent (hue, saturation, brightness) or pick a preset swatch.");
     saveButton.onClick = [this] { savePresetDialog(); };
-    presetBar.onClick = [this] { showPresetPanel (! presetPanel.isVisible()); };
+    presetBar.onClick = [this] { showBrowser (! browserTabs.isVisible() || browserTabs.getTab() != 0, 0); };
     presetBar.onPrev = [this] { stepPreset (-1); };
     presetBar.onNext = [this] { stepPreset (+1); };
 
@@ -168,13 +167,10 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
 
     groups.setSelected (proc.ui.group);
     groups.onSelect = [this] (int g) { proc.joinGroup (g); groups.setSelected (proc.getGroup()); };
-    groups.onBrowse = [this] { showGroupBrowser (! groupBrowser.isVisible()); };
+    groups.onBrowse = [this] { showBrowser (! browserTabs.isVisible()); };
     groupBrowser.onAssign = [this] (int id, int grp) { MetaTuneProcessor::setInstanceGroup (id, grp); refreshGroupBrowser(); };
-    groupBrowser.onRename = [this] (int grp) { showGroupBrowser (false); pendingSave = PendingSave::GroupName; pendingGroup = grp; saveCard.open (MetaTuneProcessor::groupName (grp)); };
-    groupBrowser.onMouseLeave = [this] {
-        if (! groupBrowser.getLocalBounds().contains (groupBrowser.getMouseXYRelative()))
-            showGroupBrowser (false);
-    };
+    groupBrowser.onRename = [this] (int grp) { showBrowser (false); pendingSave = PendingSave::GroupName; pendingGroup = grp; saveCard.open (MetaTuneProcessor::groupName (grp)); };
+    groupBrowser.onMouseLeave = nullptr;
 
     for (auto* b : { &helpButton, &heatButton, &detectedButton })
         b->setClickingTogglesState (true);
@@ -762,12 +758,11 @@ void MetaTuneEditor::updatePicker()
 
 void MetaTuneEditor::mouseDown (const juce::MouseEvent& e)
 {
-    if (presetPanel.isVisible() && e.eventComponent != &presetPanel && e.eventComponent != &presetBar)
-        showPresetPanel (false);
+    if (browserTabs.isVisible() && e.eventComponent != &presetPanel && e.eventComponent != &groupBrowser
+        && e.eventComponent != &browserTabs && e.eventComponent != &presetBar && e.eventComponent != &groups)
+        showBrowser (false);
     if (settingsPanel.isVisible() && e.eventComponent != &settingsPanel && e.eventComponent != &menuButton)
         showSettingsPanel (false);
-    if (groupBrowser.isVisible() && e.eventComponent != &groupBrowser && e.eventComponent != &groups)
-        showGroupBrowser (false);
     if (colorPanel.isVisible() && e.eventComponent != &colorPanel && e.eventComponent != &colorButton)
         showColorPanel (false);
     if (! rootPicker.isVisible() || e.eventComponent == &rootPicker || rootPicker.isParentOf (e.eventComponent))
@@ -806,6 +801,42 @@ void MetaTuneEditor::applyPickedScale (int index)
         setParam (ParamID::note (i), on[i] ? 1.0f : 0.0f);
     setParam (ParamID::scale, float (metatune::ScaleType::Custom));
     proc.ui.scaleLabel = name;
+}
+
+void MetaTuneEditor::showBrowser (bool show, int tab)
+{
+    using namespace layout;
+    if (tab >= 0) browserTabs.setTab (tab);
+    if (! show)
+    {
+        browserTabs.setVisible (false);
+        presetPanel.setVisible (false);
+        groupBrowser.setVisible (false);
+        return;
+    }
+    showSettingsPanel (false);
+    showColorPanel (false);
+    const int x = 54, y = headerH + 2, w = 288, th = 26;
+    browserTabs.setBounds (x, y, w, th);
+    browserTabs.setVisible (true);
+    browserTabs.toFront (false);
+    const int maxH = rowY - (y + th) - 10;
+    if (browserTabs.getTab() == 0)
+    {
+        refreshPresetPanel();
+        presetPanel.setBounds (x, y + th, w, juce::jmin (presetPanel.preferredHeight(), maxH));
+        presetPanel.setVisible (true);
+        presetPanel.toFront (false);
+        groupBrowser.setVisible (false);
+    }
+    else
+    {
+        refreshGroupBrowser();
+        groupBrowser.setBounds (x, y + th, w, juce::jmin (groupBrowser.preferredHeight(), maxH));
+        groupBrowser.setVisible (true);
+        groupBrowser.toFront (false);
+        presetPanel.setVisible (false);
+    }
 }
 
 void MetaTuneEditor::showColorPanel (bool show)
@@ -925,6 +956,7 @@ void MetaTuneEditor::showPresetPanel (bool show)
     {
         animator.animateComponent (&presetPanel, tucked, 0.0f, 130, true, 1.0, 1.0);
         presetPanel.setVisible (false);
+        browserTabs.setVisible (false);
     }
 }
 
@@ -1007,6 +1039,7 @@ void MetaTuneEditor::showGroupBrowser (bool show)
     {
         animator.animateComponent (&groupBrowser, groupBrowser.getBounds().translated (-12, 0), 0.0f, 130, true, 1.0, 1.0);
         groupBrowser.setVisible (false);
+        browserTabs.setVisible (false);
     }
 }
 

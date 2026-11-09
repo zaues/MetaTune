@@ -1347,3 +1347,42 @@ void ColorPanel::mouseDown (const juce::MouseEvent& e)
 
 void ColorPanel::mouseDrag (const juce::MouseEvent& e) { if (drag >= 0) applyDrag (e.position); }
 void ColorPanel::mouseUp (const juce::MouseEvent&) { drag = -1; }
+
+// ---- BrowserTabs
+
+juce::Rectangle<float> BrowserTabs::tabRect (int i) const
+{
+    const float w = 86.0f, pad = 14.0f;
+    return { pad + float (i) * (w + 6.0f), 0.0f, w, float (getHeight()) };
+}
+
+void BrowserTabs::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto b = getLocalBounds().toFloat();
+    juce::Path bg;
+    bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight() + 8.0f, 8.0f, 8.0f, true, true, false, false);
+    g.setColour (juce::Colour (0xff232327));
+    g.fillPath (bg);
+
+    const char* names[] = { "Presets", "Groups" };
+    const auto mouse = getMouseXYRelative().toFloat();
+    for (int i = 0; i < 2; ++i)
+    {
+        const auto r = tabRect (i);
+        const bool sel = i == tab, hot = r.contains (mouse);
+        g.setFont (font (13.5f, sel));
+        shadowText (g, names[i], r, juce::Justification::centred, sel ? text : textDim.interpolatedWith (text, hot ? 0.5f : 0.0f));
+        if (sel)
+        {
+            g.setColour (violet.brighter (0.2f));
+            g.fillRoundedRectangle (r.getCentreX() - 16.0f, r.getBottom() - 3.0f, 32.0f, 2.5f, 1.25f);
+        }
+    }
+}
+
+void BrowserTabs::mouseUp (const juce::MouseEvent& e)
+{
+    for (int i = 0; i < 2; ++i)
+        if (tabRect (i).contains (e.position)) { setTab (i); if (onSelect) onSelect (i); return; }
+}

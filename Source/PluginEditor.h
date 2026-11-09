@@ -45,6 +45,7 @@ private:
     void refreshPresetPanel();
     void showGroupBrowser (bool show);
     void refreshGroupBrowser();
+    void showBrowser (bool show, int tab = -1); // tabbed Presets/Groups browser from the box icon
     void showColorPanel (bool show);
     void showNotesCard(); // "What's New" overlay
     void showSettingsPanel (bool show);
@@ -75,6 +76,7 @@ private:
     RootPicker rootPicker;
     PresetPanel presetPanel;
     GroupBrowser groupBrowser;
+    BrowserTabs browserTabs;
     ColorPanel colorPanel;
     SettingsPanel settingsPanel;
     SavePresetCard saveCard;
