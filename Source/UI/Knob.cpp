@@ -137,12 +137,12 @@ void Knob::paint (juce::Graphics& g)
     const float lcdY = style.ticks ? c.y - R * 0.21f : c.y - R * 0.24f;
     const auto readout = format (getValue());
     drawSevenSeg (g, readout, { c.x - ri, lcdY + 1.8f, 2 * ri, lcdH }, style.cells,      // drop shadow
-                  juce::Colours::black.withAlpha (0.55f), juce::Colours::transparentBlack);
+                  juce::Colours::black.withAlpha (0.55f), juce::Colours::transparentBlack, style.centreReadout);
     drawSevenSeg (g, readout, { c.x - ri, lcdY, 2 * ri, lcdH }, style.cells,
-                  text.interpolatedWith (lavender.interpolatedWith (violet, 0.35f), turning.get()), juce::Colours::white.withAlpha (0.05f));
+                  text.interpolatedWith (lavender.interpolatedWith (violet, 0.35f), turning.get()), juce::Colours::white.withAlpha (0.05f), style.centreReadout);
     g.setFont (font (juce::jmax (11.0f, R * (style.ticks ? 0.135f : 0.22f)), true));
     shadowText (g, hot && style.unit.isNotEmpty() ? style.unit : label,
-                juce::Rectangle<float> (c.x - ri, lcdY + lcdH + R * 0.08f, 2 * ri, R * (style.ticks ? 0.16f : 0.26f)),
+                juce::Rectangle<float> (c.x - ri + style.labelDx * R, lcdY + lcdH + R * 0.08f, 2 * ri, R * (style.ticks ? 0.16f : 0.26f)),
                 juce::Justification::centred, text.withAlpha (0.92f));
 }
 

@@ -15,6 +15,8 @@ public:
         int cells = 3;                             // seven-segment digit cells
         float bandFrom = -1.0f;                    // >= 0: proportion where the gradient "aggressive" band starts
         juce::String unit;                         // shown in place of the label while hovering/dragging
+        float labelDx = 0.0f;                      // horizontal nudge of the label, as a fraction of the radius
+        bool centreReadout = false;                // centre the value instead of right-aligning it in the cells
     };
 
     Knob (juce::String label, std::function<juce::String (double)> format, Style);

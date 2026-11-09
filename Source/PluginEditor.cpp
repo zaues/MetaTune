@@ -20,8 +20,8 @@ static juce::Rectangle<int> around (juce::Point<float> c, float r) { return juce
 
 MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     : AudioProcessorEditor (p), proc (p), state (p.apvts),
-      speedKnob ("Speed", formatSpeed, { -135.0f, 60.0f, true, 3, layout::speedBand, "ms" }),
-      sustainKnob ("Sustain", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -135.0f, 135.0f, false, 4, -1.0f, "%" }),
+      speedKnob ("Speed", formatSpeed, { -135.0f, 60.0f, true, 3, layout::speedBand, "ms", 0.08f }),
+      sustainKnob ("Sustain", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -135.0f, 135.0f, false, 4, -1.0f, "%", 0.0f, true }),
       amountKnob ("Amount", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -140.0f, 62.0f, true, 3, -1.0f, "%" }),
       orb (*state.getParameter (ParamID::doublerWidth), *state.getParameter (ParamID::doublerMix), "Doubler\nWidth", "Doubler\nDry / Wet", &p.undoManager),
       stabilizerSeg (*state.getParameter (ParamID::stabilizer), kStabilizerNames, &p.undoManager)

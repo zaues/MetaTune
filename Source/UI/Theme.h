@@ -118,7 +118,7 @@ private:
 // Seven-segment readout, centred in `area` with `cells` digit cells (value right-aligned); unlit
 // segments show as a faint ghost "8". Understands 0-9, '-', ' ' and '.' (the dot sits between cells).
 void drawSevenSeg (juce::Graphics&, const juce::String& value, juce::Rectangle<float> area, int cells,
-                   juce::Colour on, juce::Colour ghost);
+                   juce::Colour on, juce::Colour ghost, bool centre = false);
 
 // Lightning bolt fitted into `area`.
 juce::Path bolt (juce::Rectangle<float> area);

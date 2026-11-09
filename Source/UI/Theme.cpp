@@ -50,7 +50,7 @@ static void drawDigit (juce::Graphics& g, int bits, juce::Rectangle<float> r, ju
     }
 }
 
-void drawSevenSeg (juce::Graphics& g, const juce::String& value, juce::Rectangle<float> area, int cells, juce::Colour on, juce::Colour ghost)
+void drawSevenSeg (juce::Graphics& g, const juce::String& value, juce::Rectangle<float> area, int cells, juce::Colour on, juce::Colour ghost, bool centre)
 {
     // Split into digit glyphs and the glyph after which a decimal point sits.
     juce::Array<juce::juce_wchar> glyphs;
@@ -60,14 +60,16 @@ void drawSevenSeg (juce::Graphics& g, const juce::String& value, juce::Rectangle
         if (ch == '.') dotAfter = glyphs.size() - 1;
         else glyphs.add (ch);
     }
-    const int lead = juce::jmax (0, cells - glyphs.size());
+    // Centred: draw just the value's digits, centred (no ghost padding). Otherwise: right-aligned in `cells`.
+    const int n = centre ? glyphs.size() : cells;
+    const int lead = centre ? 0 : juce::jmax (0, cells - glyphs.size());
     const float h = area.getHeight(), dw = h * 0.50f, pitch = dw * 1.34f;
-    const float total = pitch * float (cells) - (pitch - dw);
+    const float total = pitch * float (n) - (pitch - dw);
     float x = area.getCentreX() - total * 0.5f;
-    for (int i = 0; i < cells; ++i, x += pitch)
+    for (int i = 0; i < n; ++i, x += pitch)
     {
         const int gi = i - lead;
-        drawDigit (g, gi >= 0 ? segmentsFor (glyphs[gi]) : 0, { x, area.getY(), dw, h }, on, ghost);
+        drawDigit (g, (gi >= 0 && gi < glyphs.size()) ? segmentsFor (glyphs[gi]) : 0, { x, area.getY(), dw, h }, on, ghost);
         if (gi >= 0 && gi == dotAfter)
         {
             const float d = dw * 0.19f;
