@@ -204,8 +204,8 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     presetBar.onNext = [this] { stepPreset (+1); };
 
     notePill.onClick = [this] { toneChordMode = 0; selectNoteMode(); };
-    majorPill.onClick = [this] { toneChordMode = 1; selectKeyScale (metatune::ScaleType::Major); };
-    minorPill.onClick = [this] { toneChordMode = 2; selectKeyScale (metatune::ScaleType::Minor); };
+    majorPill.onClick = [this] { toneChordMode = 1; selectScale (metatune::ScaleType::Major); };
+    minorPill.onClick = [this] { toneChordMode = 2; selectScale (metatune::ScaleType::Minor); };
     chromaticPill.onClick = [this] { toneChordMode = 0; selectScale (metatune::ScaleType::Chromatic); };
     scalePill.onClick = [this] { pickerPinned = true; };
     chromaticButton.onClick = [this] { selectScale (metatune::ScaleType::Chromatic); };
@@ -687,19 +687,6 @@ void MetaTuneEditor::selectScale (metatune::ScaleType type)
     proc.ui.scaleLabel = {};
     proc.undoManager.beginNewTransaction ("Scale");
     setParam (ParamID::scale, float (type));
-}
-
-void MetaTuneEditor::selectKeyScale (metatune::ScaleType type)
-{
-    // Apply the major/minor scale's notes on the current root, then switch to Note mode so the
-    // individual notes can be edited (matches the guide: the selector returns to Note after a key pick).
-    const int root = juce::jlimit (0, 11, int (state.getRawParameterValue (ParamID::root)->load()));
-    const auto mask = metatune::scaleMask (type, root, 0);
-    proc.ui.scaleLabel = {};
-    proc.undoManager.beginNewTransaction ("Select key");
-    for (int i = 0; i < 12; ++i)
-        setParam (ParamID::note (i), metatune::isAllowed (mask, i) ? 1.0f : 0.0f);
-    setParam (ParamID::scale, float (metatune::ScaleType::Custom));
 }
 
 void MetaTuneEditor::selectNoteMode()

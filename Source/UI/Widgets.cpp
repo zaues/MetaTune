@@ -484,7 +484,20 @@ void ValueStrip::paint (juce::Graphics& g)
     const auto track = r.removeFromTop (16.0f);
     g.setColour (bg0);
     g.fillRoundedRectangle (track, 4.0f);
-    const float x = track.getX() + 3.0f + float (valueToProportionOfLength (getValue())) * (track.getWidth() - 6.0f);
+    const float usable = track.getWidth() - 6.0f;
+    const float x  = track.getX() + 3.0f + float (valueToProportionOfLength (getValue())) * usable;
+    const float cx = track.getX() + 3.0f + float (valueToProportionOfLength (440.0)) * usable; // centre = 440 Hz / 0 cts
+    // Red fill grows out from the centre toward the handle, either direction (bright at the handle).
+    if (std::abs (x - cx) > 0.5f)
+    {
+        juce::Graphics::ScopedSaveState s (g);
+        const auto fill = juce::Rectangle<float> (juce::jmin (cx, x), track.getY(), std::abs (x - cx), track.getHeight());
+        g.reduceClipRegion (fill.getSmallestIntegerContainer());
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2a1012), cx, 0.0f, juce::Colour (0xff7b2c35), x, 0.0f, false));
+        g.fillRoundedRectangle (track, 4.0f);
+    }
+    g.setColour (juce::Colours::black.withAlpha (0.4f));
+    g.fillRect (cx - 0.5f, track.getY() + 3.0f, 1.0f, track.getHeight() - 6.0f); // faint centre tick
     g.setColour (juce::Colours::white.withAlpha (isMouseOverOrDragging() ? 1.0f : 0.9f));
     g.fillRect (x - 1.0f, track.getY() + 2.0f, 2.0f, track.getHeight() - 4.0f);
     const double hz = getValue();

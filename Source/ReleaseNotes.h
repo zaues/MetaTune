@@ -6,6 +6,9 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.5.5",
+      "- Pitch Reference now shows a red fill that grows out from the centre (440 Hz) as you move it, like the Tone Volume bar.\n"
+      "- Clicking Major or Minor now switches the scale to Major or Minor (and highlights it) instead of staying on a custom set." },
     { "0.5.4",
       "- The 'What's New' popup now fades out when you close it.\n"
       "- More space between the Doubler line and the 'Doubler Width' label.\n"
