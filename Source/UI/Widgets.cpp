@@ -206,9 +206,8 @@ void TextPill::paintButton (juce::Graphics& g, bool, bool down)
     }
     g.setColour ((kind == Kind::Primary && l > 0.5f) ? juce::Colour (0xff6b6f7a) : line.brighter (0.35f * h));
     g.strokePath (p, juce::PathStrokeType (1.0f));
-    g.setColour (textDim.interpolatedWith (theme::text, juce::jmax (l, 0.8f * h)));
     g.setFont (font (14.0f, on && kind == Kind::Primary));
-    g.drawText (getButtonText(), r, juce::Justification::centred);
+    shadowText (g, getButtonText(), r, juce::Justification::centred, textDim.interpolatedWith (theme::text, juce::jmax (l, 0.8f * h)));
 }
 
 void UpdatePill::paintButton (juce::Graphics& g, bool, bool down)

@@ -137,10 +137,10 @@ void Knob::paint (juce::Graphics& g)
     const float lcdY = style.ticks ? c.y - R * 0.17f : c.y - R * 0.24f;
     drawSevenSeg (g, format (getValue()), { c.x - ri, lcdY, 2 * ri, lcdH }, style.cells,
                   text.interpolatedWith (lavender.interpolatedWith (violet, 0.35f), turning.get()), juce::Colours::white.withAlpha (0.05f));
-    g.setColour (text.withAlpha (0.92f));
     g.setFont (font (juce::jmax (11.0f, R * (style.ticks ? 0.135f : 0.22f)), true));
-    g.drawText (hot && style.unit.isNotEmpty() ? style.unit : label, juce::Rectangle<float> (c.x - ri, lcdY + lcdH + R * 0.08f, 2 * ri, R * (style.ticks ? 0.16f : 0.26f)),
-                juce::Justification::centred);
+    shadowText (g, hot && style.unit.isNotEmpty() ? style.unit : label,
+                juce::Rectangle<float> (c.x - ri, lcdY + lcdH + R * 0.08f, 2 * ri, R * (style.ticks ? 0.16f : 0.26f)),
+                juce::Justification::centred, text.withAlpha (0.92f));
 }
 
 void Knob::mouseDown (const juce::MouseEvent& e)

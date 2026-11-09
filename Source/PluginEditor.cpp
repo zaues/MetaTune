@@ -331,6 +331,11 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
         g.fillRect (t);
         g.setGradientFill (juce::ColourGradient (juce::Colour (0x302a4a6b), t.getCentreX() + 90, t.getY(), juce::Colour (0x002a4a6b), t.getCentreX() + 90, t.getBottom() + 30, true));
         g.fillRect (t);
+        juce::AttributedString shadow;
+        shadow.append (wordmarkA, font (22.0f), juce::Colours::black.withAlpha (0.5f));
+        shadow.append (wordmarkB, font (22.0f, true), juce::Colours::black.withAlpha (0.5f));
+        shadow.setJustification (juce::Justification::centred);
+        shadow.draw (g, t.translated (0.0f, 1.5f));
         juce::AttributedString word;
         word.append (wordmarkA, font (22.0f), text.withAlpha (0.85f));
         word.append (wordmarkB, font (22.0f, true), text);
@@ -418,9 +423,9 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     g.setColour (juce::Colours::black.withAlpha (0.6f));
     g.fillRect (0, rowY, kW, 1);
     g.fillRect (0, rowY + rowH - 1, kW, 1);
-    g.setColour (textDim);
     g.setFont (font (13.0f, true));
-    g.drawText ("Select", 24, rowY, 60, rowH, juce::Justification::centredLeft);
+    shadowText (g, "Select", juce::Rectangle<float> (24.0f, float (rowY), 60.0f, float (rowH)), juce::Justification::centredLeft, textDim);
+    g.setColour (textDim);
     g.fillRect (96, rowY + rowH / 2, 20, 1);
     g.setColour (juce::Colour (0xff2a2a2d));
     g.fillRoundedRectangle (233.0f, float (rowY + 8), 278.0f, 32.0f, 16.0f);
@@ -433,13 +438,11 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
         const auto lbl = juce::Rectangle<float> (822.0f, float (rowY + 9), 120.0f, 30.0f);
         g.setColour (juce::Colour (0xff2c2c2f));
         g.fillRoundedRectangle (lbl, 15.0f);
-        g.setColour (text.withAlpha (0.9f));
         g.setFont (font (14.0f, true));
-        g.drawText ("Note Transition", lbl, juce::Justification::centred);
+        shadowText (g, "Note Transition", lbl, juce::Justification::centred, text.withAlpha (0.9f));
     }
-    g.setColour (e.lowLatency.getToggleState() ? text : greyText);
     g.setFont (font (13.0f, true));
-    g.drawFittedText ("Low\nLatency", 1010, rowY + 4, 68, rowH - 8, juce::Justification::centredLeft, 2, 1.0f);
+    shadowFittedText (g, "Low\nLatency", juce::Rectangle<int> (1010, rowY + 4, 68, rowH - 8), juce::Justification::centredLeft, 2, e.lowLatency.getToggleState() ? text : greyText);
 
     // Bottom side columns.
     g.setColour (juce::Colour (0xff1a1a1b));
@@ -453,18 +456,17 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     for (int y : { 624, 689, 760 })
         g.fillRect (rightX, y, kW - rightX, 1);
 
-    g.setColour (textDim);
     g.setFont (font (12.5f, true));
     if (e.proc.ui.heatmaps)
     {
-        g.drawText ("Input", 24, bottomY + e.keyboard.heatInputY(), 60, KeyboardPanel::kHeatH, juce::Justification::centredLeft);
-        g.drawText ("Output", 24, bottomY + e.keyboard.heatOutputY(), 60, KeyboardPanel::kHeatH, juce::Justification::centredLeft);
+        shadowText (g, "Input", juce::Rectangle<float> (24.0f, float (bottomY + e.keyboard.heatInputY()), 60.0f, float (KeyboardPanel::kHeatH)), juce::Justification::centredLeft, textDim);
+        shadowText (g, "Output", juce::Rectangle<float> (24.0f, float (bottomY + e.keyboard.heatOutputY()), 60.0f, float (KeyboardPanel::kHeatH)), juce::Justification::centredLeft, textDim);
+        g.setColour (textDim);
         g.fillRect (96, bottomY + e.keyboard.heatInputY() + KeyboardPanel::kHeatH / 2, 20, 1);
         g.fillRect (96, bottomY + e.keyboard.heatOutputY() + KeyboardPanel::kHeatH / 2, 20, 1);
     }
-    g.setColour (text.withAlpha (0.9f));
-    g.drawText ("Tone Volume", 0, 630, leftW, 18, juce::Justification::centred);
-    g.drawText ("Pitch Reference", rightX, 772, kW - rightX, 18, juce::Justification::centred);
+    shadowText (g, "Tone Volume", juce::Rectangle<float> (0.0f, 630.0f, float (leftW), 18.0f), juce::Justification::centred, text.withAlpha (0.9f));
+    shadowText (g, "Pitch Reference", juce::Rectangle<float> (float (rightX), 772.0f, float (kW - rightX), 18.0f), juce::Justification::centred, text.withAlpha (0.9f));
 
     const int root = juce::jlimit (0, 11, int (e.state.getRawParameterValue (ParamID::root)->load()));
     static const char* flatNames[] { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" };
@@ -474,6 +476,7 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     {
         // First run only (no key ever picked): a mouse cursor and a prompt instead of a key.
         const auto area = e.rootArea.withHeight (100).toFloat();
+        const juce::Colour promptCol (0xffc8c6d2); // grey-white, to match the prompt text
         juce::Path cur;
         cur.startNewSubPath (0.0f, 0.0f);
         cur.lineTo (0.0f, 16.0f);
@@ -483,25 +486,31 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
         cur.lineTo (6.7f, 11.0f);
         cur.lineTo (12.5f, 11.0f);
         cur.closeSubPath();
-        const auto curBox = juce::Rectangle<float> (24.0f, 30.0f).withCentre ({ area.getCentreX(), float (e.rootArea.getY()) + 28.0f });
-        g.fillPath (cur, cur.getTransformToScaleToFit (curBox, true));
-        g.setColour (text.withAlpha (0.9f));
-        g.setFont (font (15.0f, true));
-        g.drawFittedText ("Hover to\nset scale", e.rootArea.withTrimmedTop (62).withHeight (52), juce::Justification::centredTop, 2, 1.0f);
+        const auto curBox = juce::Rectangle<float> (31.0f, 39.0f).withCentre ({ area.getCentreX(), float (e.rootArea.getY()) + 28.0f });
+        const auto curXform = cur.getTransformToScaleToFit (curBox, true);
+        g.setColour (juce::Colours::black.withAlpha (0.5f)); // shadow
+        g.fillPath (cur, curXform.followedBy (juce::AffineTransform::translation (0.0f, 1.6f)));
+        g.setColour (promptCol);
+        g.fillPath (cur, curXform);
+        g.setFont (font (18.0f, true));
+        shadowFittedText (g, "Hover to\nset scale", e.rootArea.withTrimmedTop (66).withHeight (56), juce::Justification::centredTop, 2, promptCol);
     }
     else
     {
         // Letter large; an accidental sits raised and smaller to its right.
-        juce::AttributedString as;
-        as.append (name.substring (0, 1), font (80.0f), text);
-        if (name.length() > 1)
-            as.append (name.substring (1), font (40.0f), text);
-        juce::TextLayout tl;
-        tl.createLayout (as, 200.0f);
+        auto makeLayout = [&] (juce::Colour col) {
+            juce::AttributedString as;
+            as.append (name.substring (0, 1), font (80.0f), col);
+            if (name.length() > 1) as.append (name.substring (1), font (40.0f), col);
+            juce::TextLayout tl; tl.createLayout (as, 200.0f); return tl;
+        };
+        auto tl = makeLayout (text);
         const auto area = e.rootArea.withHeight (100).toFloat();
-        tl.draw (g, juce::Rectangle<float> (tl.getWidth(), tl.getHeight()).withCentre (area.getCentre()));
+        const auto target = juce::Rectangle<float> (tl.getWidth(), tl.getHeight()).withCentre (area.getCentre());
+        makeLayout (juce::Colours::black.withAlpha (0.5f)).draw (g, target.translated (0.0f, 2.0f)); // shadow
+        tl.draw (g, target);
         g.setFont (font (19.0f, true));
-        g.drawText (e.scaleDisplayName(), e.rootArea.withTrimmedTop (98).withHeight (26), juce::Justification::centred);
+        shadowText (g, e.scaleDisplayName(), e.rootArea.withTrimmedTop (98).withHeight (26).toFloat(), juce::Justification::centred, text);
     }
 
     // Chromatic tab.
