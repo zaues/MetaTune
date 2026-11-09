@@ -19,7 +19,7 @@ AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=MetaTune personal build
 DefaultDirName={autopf}\{#AppName}
-DisableDirPage=yes
+DisableDirPage=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
@@ -50,7 +50,7 @@ Source: "..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Type: filesandordirs; Name: "{commoncf64}\VST3\{#Bundle}"
 
 [Messages]
-FinishedLabel=MetaTune is installed.%n%nOpen FL Studio. If MetaTune isn't in the plugin list yet, go to Options > Manage plugins > Find more plugins.
+FinishedLabel=MetaTune is installed.%n%nThe plugin (VST3) is in the standard VST3 folder: {commoncf64}\VST3\MetaTune.vst3%nThe updater and licenses are in: {app}%n%nOpen FL Studio. If MetaTune isn't in the plugin list yet, go to Options > Manage plugins > Find more plugins.
 
 [Code]
 // FL Studio keeps loaded plugins locked: replacing the bundle while it runs fails or leaves the old one.

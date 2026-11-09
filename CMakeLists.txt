@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(MetaTune VERSION 0.3.2 LANGUAGES C CXX)
+project(MetaTune VERSION 0.3.3 LANGUAGES C CXX)
 
 # Product naming lives here only; DSP code never refers to it.
 set(PRODUCT_NAME "MetaTune" CACHE STRING "User-visible plugin name")
@@ -16,7 +16,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded)
 add_subdirectory(third_party/JUCE)
 
 juce_add_plugin(MetaTune
-    COMPANY_NAME "zaues"
+    COMPANY_NAME "Digital"
     BUNDLE_ID com.zaues.metatune
     PLUGIN_MANUFACTURER_CODE Lyra
     PLUGIN_CODE LyTn
@@ -61,7 +61,7 @@ target_link_libraries(MetaTune
 # Updater app: installed next to the licenses, started by the plugin's Update button.
 juce_add_gui_app(MetaTuneUpdater
     PRODUCT_NAME "${PRODUCT_NAME} Updater"
-    COMPANY_NAME "zaues"
+    COMPANY_NAME "Digital"
     VERSION ${PROJECT_VERSION})
 target_sources(MetaTuneUpdater PRIVATE
     Source/Updater/UpdaterMain.cpp
