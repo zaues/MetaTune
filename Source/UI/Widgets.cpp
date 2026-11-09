@@ -120,6 +120,15 @@ juce::Path palette()
     p.addEllipse (12.0f, 8.5f, 8.5f, 8.5f);
     return p;
 }
+juce::Path key()
+{
+    juce::Path p;
+    p.addEllipse (3.0f, 7.0f, 9.0f, 9.0f);                 // bow (ring)
+    p.startNewSubPath (11.5f, 11.5f); p.lineTo (21.0f, 11.5f); // shaft
+    p.startNewSubPath (17.5f, 11.5f); p.lineTo (17.5f, 15.0f); // teeth
+    p.startNewSubPath (20.5f, 11.5f); p.lineTo (20.5f, 14.0f);
+    return p;
+}
 } // namespace icons
 
 static void strokeIcon (juce::Graphics& g, const juce::Path& icon, juce::Rectangle<float> area, float thickness = 1.7f)
@@ -1675,4 +1684,94 @@ void BrowserTabs::mouseUp (const juce::MouseEvent& e)
 {
     for (int i = 0; i < 2; ++i)
         if (tabRect (i).contains (e.position)) { setTab (i); if (onSelect) onSelect (i); return; }
+}
+
+// ---- AutoKeyCard
+
+void AutoKeyCard::open (bool inst, bool have, int r, bool m) { setState (inst, have, r, m); setVisible (true); toFront (false); }
+void AutoKeyCard::setState (bool inst, bool have, int r, bool m)
+{
+    if (inst == installed && have == haveKey && r == root && m == minor) return;
+    installed = inst; haveKey = have; root = r; minor = m; repaint();
+}
+juce::Rectangle<float> AutoKeyCard::actionButton() const
+{
+    const auto c = cardBounds().toFloat();
+    return { c.getCentreX() - 100.0f, c.getBottom() - 58.0f, 200.0f, 34.0f };
+}
+juce::Rectangle<float> AutoKeyCard::closeBounds() const
+{
+    const auto c = cardBounds().toFloat();
+    return { c.getRight() - 30.0f, c.getY() + 12.0f, 18.0f, 18.0f };
+}
+
+void AutoKeyCard::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto mouse = getMouseXYRelative().toFloat();
+    g.fillAll (juce::Colours::black.withAlpha (0.55f));
+    const auto c = cardBounds().toFloat();
+    juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 24, { 0, 8 }).drawForRectangle (g, c.getSmallestIntegerContainer());
+    g.setColour (menuBg);
+    g.fillRoundedRectangle (c, 10.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.08f));
+    g.drawRoundedRectangle (c.reduced (0.5f), 10.0f, 1.0f);
+
+    g.setColour (violet.brighter (0.15f));
+    strokeIcon (g, icons::key(), juce::Rectangle<float> (22.0f, 22.0f).withCentre ({ c.getX() + 34.0f, c.getY() + 33.0f }), 2.0f);
+    g.setFont (font (19.0f, true));
+    shadowText (g, "Auto Key", juce::Rectangle<float> (c.getX() + 56.0f, c.getY() + 19.0f, 200.0f, 28.0f), juce::Justification::centredLeft, text);
+
+    const auto x = closeBounds();
+    g.setColour (x.expanded (4.0f).contains (mouse) ? text : textDim);
+    g.drawLine (x.getX(), x.getY(), x.getRight(), x.getBottom(), 1.7f);
+    g.drawLine (x.getX(), x.getBottom(), x.getRight(), x.getY(), 1.7f);
+
+    static const char* N[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    const auto body = juce::Rectangle<float> (c.getX() + 26.0f, c.getY() + 66.0f, c.getWidth() - 52.0f, c.getHeight() - 140.0f);
+    juce::String btn;
+    if (! installed)
+    {
+        g.setFont (font (15.0f, true));
+        shadowText (g, "MetaKey isn't installed", body.withHeight (24.0f), juce::Justification::centredTop, text);
+        g.setFont (font (13.0f));
+        shadowFittedText (g, "It detects your beat's key and sends it straight to Auto Key. Install it to continue.",
+                          body.withTrimmedTop (30.0f), juce::Justification::centredTop, 3, textDim);
+        btn = "Install MetaKey";
+    }
+    else if (haveKey)
+    {
+        g.setFont (font (13.5f));
+        shadowText (g, "MetaKey detects", body.withHeight (20.0f), juce::Justification::centred, textDim);
+        g.setFont (font (32.0f, true));
+        shadowText (g, juce::String (N[root % 12]) + (minor ? " Minor" : " Major"),
+                    body.withTrimmedTop (22.0f).withHeight (42.0f), juce::Justification::centred, text);
+        btn = "Apply to MetaTune";
+    }
+    else
+    {
+        g.setFont (font (13.5f));
+        shadowFittedText (g, "Add MetaKey to the mixer track with your beat and press play, then this will light up.",
+                          body, juce::Justification::centredTop, 3, textDim);
+    }
+
+    if (btn.isNotEmpty())
+    {
+        const auto b = actionButton();
+        g.setColour (violet.withAlpha (b.contains (mouse) ? 1.0f : 0.9f));
+        g.fillRoundedRectangle (b, b.getHeight() * 0.5f);
+        g.setFont (font (14.0f, true));
+        shadowText (g, btn, b, juce::Justification::centred, juce::Colours::white);
+    }
+}
+
+void AutoKeyCard::mouseUp (const juce::MouseEvent& e)
+{
+    const auto p = e.position;
+    if (closeBounds().expanded (6.0f).contains (p) || ! cardBounds().toFloat().contains (p)) { if (onClose) onClose(); return; }
+    if ((! installed || haveKey) && actionButton().contains (p))
+    {
+        if (! installed) { if (onInstall) onInstall(); }
+        else if (haveKey) { if (onApply) onApply (root, minor); }
+    }
 }

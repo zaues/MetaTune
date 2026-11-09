@@ -50,7 +50,7 @@ void KeyDetector::processFrame (const float* windowed)
     const double binHz = sr / double (kSize);
     const float floorMag = maxMag * 0.04f;
     double frameEnergy = 0.0;
-    std::array<double, 12> frameChroma {};
+    std::array<double, kBins> frameChroma {};
     for (int b = 2; b < nBins - 1; ++b)
     {
         const float m = fftData[(size_t) b];
@@ -72,53 +72,81 @@ void KeyDetector::processFrame (const float* windowed)
         const double midi = 69.0 + 12.0 * std::log2 (f / 440.0);
         double pcf = std::fmod (midi, 12.0);
         if (pcf < 0.0) pcf += 12.0;
-        const int pc = ((int) std::llround (pcf)) % 12;
+        const int bin = ((int) std::llround (pcf * (kBins / 12.0))) % kBins; // 3 sub-bins per semitone
         const double mag = std::sqrt ((double) m) * w; // compress so one loud peak can't dominate
-        frameChroma[(size_t) pc] += mag;
+        frameChroma[(size_t) bin] += mag;
         frameEnergy += mag;
     }
     if (frameEnergy < 1.0e-9) return; // no tonal peaks this frame
-    for (int i = 0; i < 12; ++i)
+    for (int i = 0; i < kBins; ++i)
         chromaAcc[(size_t) i] += frameChroma[(size_t) i] / frameEnergy; // each frame weighted equally
     frames += 1.0;
 }
 
+// Estimate a single global tuning offset (so tracks not at A=440 still map to the right pitch classes),
+// then fold the 36-bin chroma down to 12 pitch classes with that offset removed.
+std::array<double, 12> KeyDetector::foldTuned() const
+{
+    // Tuning = circular mean of the energy over the 3 sub-bins that make up each semitone.
+    double re = 0.0, im = 0.0;
+    for (int b = 0; b < kBins; ++b)
+    {
+        const double ang = 2.0 * juce::MathConstants<double>::pi * double (b % 3) / 3.0;
+        re += chromaAcc[(size_t) b] * std::cos (ang);
+        im += chromaAcc[(size_t) b] * std::sin (ang);
+    }
+    const double shift = (re != 0.0 || im != 0.0)
+        ? std::atan2 (im, re) / (2.0 * juce::MathConstants<double>::pi) * 3.0 // sub-bins, -1.5..1.5
+        : 0.0;
+
+    std::array<double, 12> c {};
+    for (int b = 0; b < kBins; ++b)
+    {
+        const double adj = double (b) - shift;
+        const int pc = (((int) std::llround (adj / 3.0)) % 12 + 12) % 12;
+        c[(size_t) pc] += chromaAcc[(size_t) b];
+    }
+    return c;
+}
+
 std::array<float, 12> KeyDetector::chroma() const
 {
-    std::array<float, 12> c {};
+    auto c = foldTuned();
+    std::array<float, 12> out {};
     double mx = 0.0;
-    for (double v : chromaAcc) mx = std::max (mx, v);
-    if (mx <= 0.0) return c;
-    for (int i = 0; i < 12; ++i) c[(size_t) i] = float (chromaAcc[(size_t) i] / mx);
-    return c;
+    for (double v : c) mx = std::max (mx, v);
+    if (mx <= 0.0) return out;
+    for (int i = 0; i < 12; ++i) out[(size_t) i] = float (c[(size_t) i] / mx);
+    return out;
+}
+
+// Albrecht & Shanahan (2013) key profiles, derived from a large corpus: more reliable major/minor
+// discrimination than the original Krumhansl-Schmuckler weights.
+static const double kMaj[12] = { 0.2380, 0.0060, 0.1110, 0.0060, 0.1370, 0.0940, 0.0160, 0.2140, 0.0090, 0.0800, 0.0080, 0.0810 };
+static const double kMin[12] = { 0.2200, 0.0060, 0.1040, 0.1230, 0.0190, 0.1030, 0.0120, 0.2140, 0.0620, 0.0220, 0.0610, 0.0520 };
+
+static double correlate (const std::array<double, 12>& c, const double* prof, int rot)
+{
+    double mc = 0.0, mp = 0.0;
+    for (int i = 0; i < 12; ++i) { mc += c[(size_t) ((i + rot) % 12)]; mp += prof[i]; }
+    mc /= 12.0; mp /= 12.0;
+    double num = 0.0, dc = 0.0, dp = 0.0;
+    for (int i = 0; i < 12; ++i)
+    {
+        const double a = c[(size_t) ((i + rot) % 12)] - mc, b = prof[i] - mp;
+        num += a * b; dc += a * a; dp += b * b;
+    }
+    return (dc > 0.0 && dp > 0.0) ? num / std::sqrt (dc * dp) : -1.0;
 }
 
 KeyDetector::Result KeyDetector::estimate() const
 {
     if (frames < 3.0) return {};
 
-    std::array<double, 12> c {};
-    double sum = 0.0;
-    for (int i = 0; i < 12; ++i) { c[(size_t) i] = chromaAcc[(size_t) i]; sum += c[(size_t) i]; }
+    auto c = foldTuned();
+    double sum = 0.0; for (double v : c) sum += v;
     if (sum <= 0.0) return {};
     for (auto& v : c) v /= sum;
-
-    static const double maj[12] = { 6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88 };
-    static const double min_[12] = { 6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17 };
-
-    auto corr = [&c] (const double* prof, int rot)
-    {
-        double mc = 0.0, mp = 0.0;
-        for (int i = 0; i < 12; ++i) { mc += c[(size_t) ((i + rot) % 12)]; mp += prof[i]; }
-        mc /= 12.0; mp /= 12.0;
-        double num = 0.0, dc = 0.0, dp = 0.0;
-        for (int i = 0; i < 12; ++i)
-        {
-            const double a = c[(size_t) ((i + rot) % 12)] - mc, b = prof[i] - mp;
-            num += a * b; dc += a * a; dp += b * b;
-        }
-        return (dc > 0.0 && dp > 0.0) ? num / std::sqrt (dc * dp) : -1.0;
-    };
 
     Result best;
     double bestScore = -2.0, second = -2.0;
@@ -129,9 +157,10 @@ KeyDetector::Result KeyDetector::estimate() const
     };
     for (int rot = 0; rot < 12; ++rot)
     {
-        consider (corr (maj, rot), rot, false);
-        consider (corr (min_, rot), rot, true);
+        consider (correlate (c, kMaj, rot), rot, false);
+        consider (correlate (c, kMin, rot), rot, true);
     }
+    if (best.root < 0) return {};
     best.confidence = (float) juce::jlimit (0.0, 1.0, (bestScore - second) * 4.0);
     return best;
 }

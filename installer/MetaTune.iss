@@ -13,6 +13,7 @@
 #define BuiltUpdater "..\build\msvc-Release\MetaTuneUpdater_artefacts\Release\MetaTune Updater.exe"
 #define KeyBundle "MetaKey.vst3"
 #define BuiltKey "..\build\msvc-Release\MetaKey_artefacts\Release\VST3\" + KeyBundle
+#define BuiltKeySetup "C:\Users\TylerPC\Downloads\Updated\MetaKey-Setup.exe"
 
 [Setup]
 AppId={{5B7C2E1A-8F3D-4C6B-9A2E-7D41F0C3B8E5}
@@ -34,6 +35,14 @@ WizardStyle=modern
 UninstallDisplayName={#AppName}
 LicenseFile=..\LICENSE
 
+[Types]
+Name: "full"; Description: "MetaTune + MetaKey (recommended)"
+Name: "custom"; Description: "Custom"; Flags: iscustom
+
+[Components]
+Name: "metatune"; Description: "MetaTune - pitch correction"; Types: full custom; Flags: fixed
+Name: "metakey"; Description: "MetaKey - key detector (companion plugin)"; Types: full custom
+
 [InstallDelete]
 ; The old MetaTune build is the same plugin underneath: hosts would list it twice.
 Type: filesandordirs; Name: "{commoncf64}\VST3\MetaTune.vst3"
@@ -43,8 +52,10 @@ Type: filesandordirs; Name: "{commoncf64}\VST3\{#KeyBundle}"
 
 [Files]
 Source: "{#BuiltBundle}\*"; DestDir: "{commoncf64}\VST3\{#Bundle}"; Flags: recursesubdirs createallsubdirs ignoreversion
-; MetaKey: the separate key-detection plugin (installed alongside MetaTune).
-Source: "{#BuiltKey}\*"; DestDir: "{commoncf64}\VST3\{#KeyBundle}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; MetaKey: the separate key-detection plugin (optional component, on by default).
+Source: "{#BuiltKey}\*"; DestDir: "{commoncf64}\VST3\{#KeyBundle}"; Components: metakey; Flags: recursesubdirs createallsubdirs ignoreversion
+; Always bundle the standalone MetaKey installer so MetaTune's Auto Key can install it on demand.
+Source: "{#BuiltKeySetup}"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 ; The plugin's Update button runs a temp copy of this; the copy lets this file be replaced during an update.
 Source: "{#BuiltUpdater}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion

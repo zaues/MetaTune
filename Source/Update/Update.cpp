@@ -183,6 +183,42 @@ bool Settings::checkDue()
     return juce::Time::currentTimeMillis() - last > juce::int64 (6) * 3600 * 1000;
 }
 
+// ---- Auto Key bridge ----
+KeyStatus readMetaKeyStatus()
+{
+    KeyStatus s;
+    const auto f = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                       .getChildFile ("MetaTune").getChildFile ("metakey.status");
+    if (! f.existsAsFile()) return s;
+    juce::int64 time = 0;
+    for (const auto& ln : juce::StringArray::fromLines (f.loadFileAsString()))
+    {
+        const auto k = ln.upToFirstOccurrenceOf ("=", false, false).trim();
+        const auto v = ln.fromFirstOccurrenceOf ("=", false, false).trim();
+        if (k == "root") s.root = v.getIntValue();
+        else if (k == "minor") s.minor = v.getIntValue() != 0;
+        else if (k == "conf") s.conf = v.getFloatValue();
+        else if (k == "time") time = v.getLargeIntValue();
+    }
+    s.live = (juce::Time::currentTimeMillis() - time) < 5000; // written within 5s = a MetaKey is running
+    return s;
+}
+
+static juce::File commonVst3Dir()
+{
+    const auto cpf = juce::SystemStats::getEnvironmentVariable ("CommonProgramFiles", "C:\\Program Files\\Common Files");
+    return juce::File (cpf).getChildFile ("VST3");
+}
+
+bool metaKeyInstalled() { return commonVst3Dir().getChildFile ("MetaKey.vst3").exists(); }
+
+juce::File metaKeyInstaller()
+{
+    // Bundled by MetaTune's installer next to the updater: C:\Program Files\MetaTune\MetaKey-Setup.exe.
+    return juce::File::getSpecialLocation (juce::File::globalApplicationsDirectory)
+        .getChildFile (JucePlugin_Name).getChildFile ("MetaKey-Setup.exe");
+}
+
 // ---- updater hand-off
 static juce::File installedUpdater()
 {

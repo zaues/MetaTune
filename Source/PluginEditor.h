@@ -46,6 +46,8 @@ private:
     void refreshGroupBrowser();
     void showBrowser (bool show, int tab = -1); // tabbed Presets/Groups browser from the box icon
     void showColorPanel (bool show);
+    void showAutoKey();            // open the Auto Key card (install prompt or MetaKey status + apply)
+    void applyAutoKey (int root, bool minor);
     void repaintAll(); // after a theme / colour change: drop cached textures and repaint everything
     void showNotesCard(); // "What's New" overlay
     void showSettingsPanel (bool show);
@@ -81,6 +83,7 @@ private:
     SettingsPanel settingsPanel;
     SavePresetCard saveCard;
     ReleaseNotesCard notesCard;
+    AutoKeyCard autoKeyCard;
 
     TextPill notePill { "Note", TextPill::Kind::Primary };
     TextPill majorPill { "Major", TextPill::Kind::Plain }, minorPill { "Minor", TextPill::Kind::Plain };
@@ -97,6 +100,7 @@ private:
     IconButton heatButton { "heat", icons::eye(), "No Pitch\nReference", icons::swap() };
     IconButton detectedButton { "detected", icons::eye(), "Detected\nNotes", icons::swap() };
     IconButton bypassButton { "bypass", icons::power(), "Global\nBypass" };
+    IconButton autoKeyButton { "autokey", icons::key(), "Auto\nKey" };
     IconButton chromaticButton { "chromatic", icons::swap(), "Chromatic" };
     UpdatePill updatePill;
     update::Checker updateChecker;

@@ -64,6 +64,19 @@ struct Settings
     static void setFavorite (const juce::String& folder, const juce::String& name, bool on);
 };
 
+// --- Auto Key: the bridge to the separate MetaKey plugin ---
+struct KeyStatus
+{
+    int root = -1;      // tonic 0..11, -1 = none
+    bool minor = false;
+    float conf = 0.0f;
+    bool live = false;  // MetaKey wrote this within the last few seconds (an instance is running)
+    bool valid() const noexcept { return root >= 0; }
+};
+KeyStatus readMetaKeyStatus();     // the key MetaKey last published to the shared file
+bool metaKeyInstalled();           // is MetaKey.vst3 present in the common VST3 folder?
+juce::File metaKeyInstaller();     // the bundled MetaKey installer (next to MetaTune's updater)
+
 // Copies the updater to %TEMP% (the installer replaces the original while it runs) and starts it
 // with the release and this host's exe/pid. Returns false if the updater is missing.
 bool launchUpdater (const Release&);

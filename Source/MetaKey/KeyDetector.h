@@ -26,16 +26,18 @@ public:
 
 private:
     void processFrame (const float* windowed);
+    std::array<double, 12> foldTuned() const; // estimate the global tuning, fold the 36-bin chroma to 12
 
     static constexpr int kOrder = 12;
     static constexpr int kSize  = 1 << kOrder; // 4096
     static constexpr int kHop   = kSize / 2;
+    static constexpr int kBins  = 36;          // 3 bins per semitone, so tuning up to +/-1/6 tone is recoverable
 
     double sr = 44100.0;
     juce::dsp::FFT fft { kOrder };
     std::array<float, kSize> window {};
     std::vector<float> acc;                    // input samples awaiting a full frame
     std::array<float, kSize * 2> fftData {};
-    std::array<double, 12> chromaAcc {};
+    std::array<double, kBins> chromaAcc {};    // high-resolution chroma, folded to 12 with a tuning estimate
     double frames = 0.0;
 };

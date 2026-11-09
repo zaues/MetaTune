@@ -107,6 +107,23 @@ void MetaKeyProcessor::publish (const KeyDetector::Result& r)
     outConf.store (r.confidence);
 }
 
+// The shared hand-off to MetaTune: a tiny file in %APPDATA%\MetaTune that MetaTune's Auto Key panel reads.
+// A fresh timestamp also tells MetaTune that a MetaKey instance is live.
+void MetaKeyProcessor::writeStatus()
+{
+    const auto r = result();
+    auto f = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                 .getChildFile ("MetaTune").getChildFile ("metakey.status");
+    f.getParentDirectory().createDirectory();
+    juce::String s;
+    s << "root=" << r.root << "\n"
+      << "minor=" << (r.minor ? 1 : 0) << "\n"
+      << "conf=" << juce::String (r.confidence, 3) << "\n"
+      << "mode=" << (int) currentMode.load() << "\n"
+      << "time=" << juce::Time::currentTimeMillis() << "\n";
+    f.replaceWithText (s);
+}
+
 void MetaKeyProcessor::run()
 {
     std::vector<float> tmp;
@@ -161,6 +178,14 @@ void MetaKeyProcessor::run()
         else if (restartFlag.exchange (false))
         {
             detector.reset();
+        }
+
+        // Publish the current key to the shared file for MetaTune, at most twice a second.
+        const juce::int64 now = juce::Time::currentTimeMillis();
+        if (now - lastStatusMs > 500)
+        {
+            lastStatusMs = now;
+            writeStatus();
         }
 
         wait (40);

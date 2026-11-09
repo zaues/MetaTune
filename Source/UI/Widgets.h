@@ -23,6 +23,7 @@ juce::Path grid();      // 2x2 squares (groups)
 juce::Path chevronUp();
 juce::Path chevronDown();
 juce::Path palette();   // three overlapping circles (colour / theme)
+juce::Path key();       // a key (Auto Key)
 }
 
 // Flat icon button; toggleable buttons light up in the accent colour when on.
@@ -403,6 +404,31 @@ private:
     juce::Image backdrop;
     float scroll = 0, lastWidth = 0;
     std::vector<juce::TextLayout> bodyLayouts;
+};
+
+// Auto Key: a full-window modal card. If MetaKey isn't installed it offers to install it; otherwise it
+// shows the key MetaKey is detecting with an Apply button (sends the key to MetaTune), or a hint to open
+// MetaKey on the beat's mixer track. State is pushed in by the editor (which polls the shared file).
+class AutoKeyCard : public juce::Component
+{
+public:
+    AutoKeyCard() { setInterceptsMouseClicks (true, true); }
+    std::function<void (int root, bool minor)> onApply;
+    std::function<void()> onInstall, onClose;
+
+    void open (bool metaKeyInstalled, bool haveKey, int root, bool minor);
+    void setState (bool metaKeyInstalled, bool haveKey, int root, bool minor);
+    void paint (juce::Graphics&) override;
+    void mouseMove (const juce::MouseEvent&) override { repaint(); }
+    void mouseUp (const juce::MouseEvent&) override;
+
+private:
+    juce::Rectangle<int> cardBounds() const { return juce::Rectangle<int> (380, 240).withCentre (getLocalBounds().getCentre()); }
+    juce::Rectangle<float> actionButton() const; // Install / Apply
+    juce::Rectangle<float> closeBounds() const;
+
+    bool installed = false, haveKey = false, minor = false;
+    int root = -1;
 };
 
 // Settings list that drops down from the header menu button, styled like the preset panel:

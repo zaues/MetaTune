@@ -53,6 +53,7 @@ public:
 private:
     void run() override;                        // analysis thread
     void publish (const KeyDetector::Result&);
+    void writeStatus();                         // publish the current key to the shared file MetaTune reads
     bool readFileMono (const juce::File&, juce::AudioBuffer<float>& out, double& fileSr);
 
     KeyDetector detector;
@@ -80,6 +81,7 @@ private:
     juce::CriticalSection chromaLock;
     std::array<float, 12> chromaOut {};
 
+    juce::int64 lastStatusMs = 0; // throttles writing the shared status file
     juce::AudioFormatManager formats;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MetaKeyProcessor)

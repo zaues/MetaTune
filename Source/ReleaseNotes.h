@@ -6,6 +6,11 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.6.0",
+      "- New: Auto Key, under Global Bypass. Open MetaKey on your beat's mixer track, then click Auto Key here and Apply to set MetaTune's key in one click.\n"
+      "- If MetaKey isn't installed, Auto Key offers to install it for you.\n"
+      "- MetaKey detection is more accurate: it estimates the track's tuning (so 432Hz and pitched samples work) and ignores drums.\n"
+      "- MetaKey is now an optional choice in the installer." },
     { "0.5.7",
       "- MetaKey is much more accurate: it now reads only the tonal peaks in the sound and ignores drums and noise, so it locks onto the real key instead of being thrown off by the beat." },
     { "0.5.6",

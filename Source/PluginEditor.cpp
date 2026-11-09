@@ -45,7 +45,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
                                                             &stabilizerSeg, &groups, &presetBar, &notePill, &majorPill, &minorPill, &chromaticPill,
                                                             &scalePill, &lowLatency, &colorButton, &menuButton, &saveButton, &undoButton, &redoButton,
                                                             &resetButton, &aButton, &copyButton, &bButton, &helpButton, &heatButton,
-                                                            &detectedButton, &bypassButton, &chromaticButton })
+                                                            &detectedButton, &bypassButton, &chromaticButton, &autoKeyButton })
         canvas.addAndMakeVisible (c);
     canvas.addChildComponent (rootPicker);
     canvas.addChildComponent (presetPanel);
@@ -73,6 +73,17 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     saveCard.onCancel = [this] { saveCard.setVisible (false); };
     canvas.addChildComponent (notesCard);
     notesCard.setBounds (0, 0, kW, kH);
+    canvas.addChildComponent (autoKeyCard);
+    autoKeyCard.setBounds (0, 0, kW, kH);
+    autoKeyButton.onClick = [this] { showAutoKey(); };
+    autoKeyButton.setTooltip ("Auto Key: pull the key MetaKey detects from your beat and apply it here.");
+    autoKeyCard.onClose = [this] { autoKeyCard.setVisible (false); };
+    autoKeyCard.onApply = [this] (int r, bool m) { autoKeyCard.setVisible (false); applyAutoKey (r, m); };
+    autoKeyCard.onInstall = [this] {
+        const auto inst = update::metaKeyInstaller();
+        if (inst.existsAsFile()) inst.startAsProcess();
+        else juce::URL ("https://github.com/zaues/MetaTune/releases/latest").launchInDefaultBrowser();
+    };
     if (update::Settings::notesVersion() != JucePlugin_VersionString)
         showNotesPending = true; // a version change (install/update): show "What's New" once the UI is laid out
     saveCard.onSave = [this] (const juce::String& n) {
@@ -220,7 +231,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
 
     for (auto* b : { &helpButton, &heatButton, &detectedButton })
         b->setClickingTogglesState (true);
-    for (auto* b : { &heatButton, &detectedButton, &bypassButton, &chromaticButton })
+    for (auto* b : { &heatButton, &detectedButton, &bypassButton, &chromaticButton, &autoKeyButton })
         b->hoverFill = false;
     helpButton.setToggleState (proc.ui.tooltips, juce::dontSendNotification);
     heatButton.setToggleState (proc.ui.heatmaps, juce::dontSendNotification);
@@ -355,9 +366,10 @@ void MetaTuneEditor::layout()
     toneSlider.setBounds (8, 650, 116, 24);
     rootArea = { 0, 690, leftW, 132 };
     chromaticButton.setBounds (0, 826, leftW, 30);
-    heatButton.setBounds (rightX + 2, 582, 130, 42);
-    detectedButton.setBounds (rightX + 2, 626, 130, 62);
-    bypassButton.setBounds (rightX + 2, 691, 130, 68);
+    heatButton.setBounds (rightX + 2, 582, 130, 38);
+    detectedButton.setBounds (rightX + 2, 622, 130, 48);
+    bypassButton.setBounds (rightX + 2, 672, 130, 42);
+    autoKeyButton.setBounds (rightX + 2, 716, 130, 42);
     refStrip.setBounds (rightX + 8, 796, 118, 50);
     // (the picker's bounds are driven every frame by updatePicker)
 }
@@ -513,7 +525,7 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     g.fillRect (rightX, bottomY, 1, kH - bottomY);
     for (int y : { 624, 689 })
         g.fillRect (0, y, leftW, 1);
-    for (int y : { 624, 689, 760 })
+    for (int y : { 620, 670, 714, 760 })
         g.fillRect (rightX, y, kW - rightX, 1);
 
     g.setFont (font (12.5f, true));
@@ -646,6 +658,12 @@ void MetaTuneEditor::timerCallback()
             proc.ui.presetName = {};
     }
     if (presetBar.name != proc.ui.presetName) { presetBar.name = proc.ui.presetName; presetBar.repaint(); }
+    if (autoKeyCard.isVisible() && (presetCheckTicks % 12) == 0) // refresh MetaKey's live key a few times a second
+    {
+        const bool inst = update::metaKeyInstalled();
+        const auto st = update::readMetaKeyStatus();
+        autoKeyCard.setState (inst, inst && st.live && st.valid(), st.root, st.minor);
+    }
     syncModeButtons();
     if (rootPicker.isVisible())
         syncRootPickerState();
@@ -912,6 +930,24 @@ void MetaTuneEditor::showBrowser (bool show, int tab)
         slideIn (groupBrowser, groupBrowser.preferredHeight());
         presetPanel.setVisible (false);
     }
+}
+
+void MetaTuneEditor::showAutoKey()
+{
+    showSettingsPanel (false);
+    showColorPanel (false);
+    showBrowser (false);
+    const bool inst = update::metaKeyInstalled();
+    const auto st = update::readMetaKeyStatus();
+    autoKeyCard.open (inst, inst && st.live && st.valid(), st.root, st.minor);
+    autoKeyCard.toFront (false);
+}
+
+void MetaTuneEditor::applyAutoKey (int root, bool minor)
+{
+    proc.undoManager.beginNewTransaction ("Auto Key");
+    setRoot (juce::jlimit (0, 11, root));
+    selectScale (minor ? metatune::ScaleType::Minor : metatune::ScaleType::Major);
 }
 
 void MetaTuneEditor::repaintAll()
