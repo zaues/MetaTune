@@ -21,12 +21,19 @@ static juce::Rectangle<int> around (juce::Point<float> c, float r) { return juce
 MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     : AudioProcessorEditor (p), proc (p), state (p.apvts),
       speedKnob ("Speed", formatSpeed, { -135.0f, 60.0f, true, 3, layout::speedBand, "ms", 0.08f }),
-      sustainKnob ("Sustain", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -135.0f, 135.0f, false, 4, -1.0f, "%", 0.0f, true }),
+      sustainKnob ("Sustain", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -135.0f, 135.0f, false, 4, -1.0f, "%", 0.0f, true, true, true }),
       amountKnob ("Amount", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -140.0f, 62.0f, true, 3, -1.0f, "%" }),
       orb (*state.getParameter (ParamID::doublerWidth), *state.getParameter (ParamID::doublerMix), "Doubler\nWidth", "Doubler\nDry / Wet", &p.undoManager),
       stabilizerSeg (*state.getParameter (ParamID::stabilizer), kStabilizerNames, &p.undoManager)
 {
+    theme::setTheme (update::Settings::lightMode());
     theme::setAccent (update::Settings::accentHue(), update::Settings::accentSat(), update::Settings::accentBright());
+    theme::orbHue = update::Settings::orbHue();
+    theme::keyHue = update::Settings::keyHue();
+    theme::meterHue = update::Settings::meterHue();
+    if (update::Settings::gradientOn())
+        theme::setGradient (true, juce::Colour::fromHSV (update::Settings::gradHueA(), 0.85f, 1.0f, 1.0f),
+                                  juce::Colour::fromHSV (update::Settings::gradHueB(), 0.85f, 1.0f, 1.0f));
     setLookAndFeel (&lnf);
     addAndMakeVisible (canvas);
 
@@ -159,9 +166,26 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     menuButton.onClick = [this] { showSettingsPanel (! settingsPanel.isVisible()); };
     colorButton.onClick = [this] { showColorPanel (! colorPanel.isVisible()); };
     colorPanel.onChange = [this] (float h, float s, float b) {
+        theme::setGradient (false, theme::gradA, theme::gradB); // a solid accent cancels the gradient
         theme::setAccent (h, s, b);
+        update::Settings::setGradient (false, update::Settings::gradHueA(), update::Settings::gradHueB());
         update::Settings::setAccentPrefs (h, s, b);
-        canvas.repaint();
+        repaintAll();
+    };
+    colorPanel.onLight = [this] (bool light) {
+        theme::setTheme (light);
+        update::Settings::setLightMode (light);
+        repaintAll();
+    };
+    colorPanel.onGradient = [this] (bool on, float gA, float gB) {
+        theme::setGradient (on, juce::Colour::fromHSV (gA, 0.85f, 1.0f, 1.0f), juce::Colour::fromHSV (gB, 0.85f, 1.0f, 1.0f));
+        update::Settings::setGradient (on, gA, gB);
+        repaintAll();
+    };
+    colorPanel.onElements = [this] (float orb, float key, float meter) {
+        theme::orbHue = orb; theme::keyHue = key; theme::meterHue = meter;
+        update::Settings::setElementHues (orb, key, meter);
+        repaintAll();
     };
     colorPanel.onMouseLeave = [this] {
         if (! colorPanel.getLocalBounds().contains (colorPanel.getMouseXYRelative()))
@@ -347,13 +371,15 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
     {
         // Tile behind the colour (palette) button.
         const auto tile = juce::Rectangle<float> (8, 8, 36, 36);
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff4a4a4e), tile.getX(), tile.getY(), juce::Colour (0xff2c2c2f), tile.getX(), tile.getBottom(), false));
+        g.setGradientFill (lightMode
+            ? juce::ColourGradient (bg3.brighter (0.25f), tile.getX(), tile.getY(), bg3.darker (0.06f), tile.getX(), tile.getBottom(), false)
+            : juce::ColourGradient (juce::Colour (0xff4a4a4e), tile.getX(), tile.getY(), juce::Colour (0xff2c2c2f), tile.getX(), tile.getBottom(), false));
         g.fillRoundedRectangle (tile, 5.0f);
     }
     {
-        // Title cell: dark nebula behind the wordmark.
+        // Title cell: dark nebula behind the wordmark (a light plate in light mode so the wordmark reads).
         const auto t = juce::Rectangle<float> (400, 0, 370, float (headerH));
-        g.setColour (juce::Colour (0xff1b1a1f));
+        g.setColour (lightMode ? headerBox : juce::Colour (0xff1b1a1f));
         g.fillRect (t);
         g.setGradientFill (juce::ColourGradient (juce::Colour (0x553d2f6b), t.getCentreX() - 60, t.getCentreY(), juce::Colour (0x003d2f6b), t.getRight(), t.getCentreY(), true));
         g.fillRect (t);
@@ -404,7 +430,7 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
             // Fine horizontal streaks over a dark gradient: brushed metal.
             e.brushed = juce::Image (juce::Image::ARGB, kW, rowY, true);
             juce::Graphics bg (e.brushed);
-            bg.setGradientFill (juce::ColourGradient (juce::Colour (0xff2a2c33), 1000.0f, 70.0f, juce::Colour (0xff16171b), 700.0f, float (rowY), true));
+            bg.setGradientFill (juce::ColourGradient (panel.brighter (0.18f), 1000.0f, 70.0f, panel.darker (0.22f), 700.0f, float (rowY), true));
             bg.fillAll();
             juce::Random rng (3);
             for (int i = 0; i < 2600; ++i)
@@ -831,9 +857,9 @@ void MetaTuneEditor::showBrowser (bool show, int tab)
     {
         if (browserTabs.isVisible())
         {
-            animator.animateComponent (&browserTabs, browserTabs.getBounds().translated (0, -8), 0.0f, 120, true, 1.0, 1.0);
-            if (presetPanel.isVisible()) animator.animateComponent (&presetPanel, presetPanel.getBounds().translated (0, -8), 0.0f, 120, true, 1.0, 1.0);
-            if (groupBrowser.isVisible()) animator.animateComponent (&groupBrowser, groupBrowser.getBounds().translated (0, -8), 0.0f, 120, true, 1.0, 1.0);
+            animator.animateComponent (&browserTabs, browserTabs.getBounds().translated (-22, 0), 0.0f, 130, true, 1.0, 1.0);
+            if (presetPanel.isVisible()) animator.animateComponent (&presetPanel, presetPanel.getBounds().translated (-22, 0), 0.0f, 130, true, 1.0, 1.0);
+            if (groupBrowser.isVisible()) animator.animateComponent (&groupBrowser, groupBrowser.getBounds().translated (-22, 0), 0.0f, 130, true, 1.0, 1.0);
         }
         browserTabs.setVisible (false);
         presetPanel.setVisible (false);
@@ -849,11 +875,11 @@ void MetaTuneEditor::showBrowser (bool show, int tab)
     const juce::Rectangle<int> tabsOpen (x, y, w, th);
     if (! wasOpen)
     {
-        browserTabs.setBounds (tabsOpen.translated (0, -10));
+        browserTabs.setBounds (tabsOpen.translated (-28, 0));
         browserTabs.setAlpha (0.0f);
         browserTabs.setVisible (true);
         browserTabs.toFront (false);
-        animator.animateComponent (&browserTabs, tabsOpen, 1.0f, 170, false, 0.0, 0.0);
+        animator.animateComponent (&browserTabs, tabsOpen, 1.0f, 190, false, 0.0, 0.0);
     }
     else
     {
@@ -869,11 +895,11 @@ void MetaTuneEditor::showBrowser (bool show, int tab)
     {
         const juce::Rectangle<int> open (x, y + th, w, juce::jmin (ph, maxH));
         animator.cancelAnimation (&c, false);
-        c.setBounds (open.translated (0, -10));
+        c.setBounds (open.translated (-28, 0));
         c.setAlpha (0.0f);
         c.setVisible (true);
         c.toFront (false);
-        animator.animateComponent (&c, open, 1.0f, 170, false, 0.0, 0.0);
+        animator.animateComponent (&c, open, 1.0f, 190, false, 0.0, 0.0);
     };
 
     if (browserTabs.getTab() == 0)
@@ -890,6 +916,12 @@ void MetaTuneEditor::showBrowser (bool show, int tab)
     }
 }
 
+void MetaTuneEditor::repaintAll()
+{
+    brushed = juce::Image(); // rebuilt on the next paint in the current theme
+    canvas.repaint();
+}
+
 void MetaTuneEditor::showColorPanel (bool show)
 {
     auto& animator = juce::Desktop::getInstance().getAnimator();
@@ -900,6 +932,9 @@ void MetaTuneEditor::showColorPanel (bool show)
     if (show)
     {
         colorPanel.setValues (update::Settings::accentHue(), update::Settings::accentSat(), update::Settings::accentBright());
+        colorPanel.setExtras (update::Settings::lightMode(), update::Settings::gradientOn(),
+                              update::Settings::gradHueA(), update::Settings::gradHueB(),
+                              update::Settings::orbHue(), update::Settings::keyHue(), update::Settings::meterHue());
         showSettingsPanel (false);
         showBrowser (false);
         showPresetPanel (false);

@@ -14,8 +14,8 @@ static juce::Colour coreColourAt (float a)
     const float u = std::fmod (a / juce::MathConstants<float>::twoPi + 1.0f, 1.0f);
     for (size_t i = 1; i < std::size (stops); ++i)
         if (u <= stops[i].first)
-            return theme::recolour (stops[i - 1].second.interpolatedWith (stops[i].second, (u - stops[i - 1].first) / (stops[i].first - stops[i - 1].first)));
-    return theme::recolour (stops[0].second);
+            return theme::orbTint (stops[i - 1].second.interpolatedWith (stops[i].second, (u - stops[i - 1].first) / (stops[i].first - stops[i - 1].first)));
+    return theme::orbTint (stops[0].second);
 }
 
 Orb::Orb (juce::RangedAudioParameter& x, juce::RangedAudioParameter& y, juce::String xn, juce::String yn, juce::UndoManager* um)
@@ -190,9 +190,9 @@ void Orb::paint (juce::Graphics& g)
         // Outer bloom: a wide nebula haze with a long, soft falloff.
         const float rb = (kSphereR + 64.0f) * U * grow;
         juce::ColourGradient bloom (violet.withAlpha (0.0f), c.x, c.y, violet.withAlpha (0.0f), c.x + rb, c.y, true);
-        bloom.addColour (0.50, theme::recolour (juce::Colour (0xff6f5eb0)).withAlpha (0.04f + 0.02f * breath + 0.08f * a));
-        bloom.addColour (0.72, theme::recolour (juce::Colour (0xff9a86e8)).withAlpha (0.12f + 0.06f * breath + 0.20f * a));
-        bloom.addColour (0.86, theme::recolour (juce::Colour (0xffb7a4ff)).withAlpha (0.07f + 0.04f * breath + 0.14f * a));
+        bloom.addColour (0.50, theme::orbTint (juce::Colour (0xff6f5eb0)).withAlpha (0.04f + 0.02f * breath + 0.08f * a));
+        bloom.addColour (0.72, theme::orbTint (juce::Colour (0xff9a86e8)).withAlpha (0.12f + 0.06f * breath + 0.20f * a));
+        bloom.addColour (0.86, theme::orbTint (juce::Colour (0xffb7a4ff)).withAlpha (0.07f + 0.04f * breath + 0.14f * a));
         g.setGradientFill (bloom);
         g.fillEllipse (c.x - rb, c.y - rb, 2 * rb, 2 * rb);
         // Reflection: a soft arc drifting over the upper edge, like light sliding across glass.
@@ -230,7 +230,7 @@ void Orb::paint (juce::Graphics& g)
         const float rm = kFieldR * U * (0.97f + 0.03f * grow);
         const float pulse = 0.5f + 0.5f * std::sin (t * 1.3f + 0.8f);
         const float lum = 0.75f + 0.25f * pulse + 0.40f * a;
-        const juce::Colour glowCol = theme::recolour (juce::Colour (0xff8f6bff));
+        const juce::Colour glowCol = theme::orbTint (juce::Colour (0xff8f6bff));
         // Outer-to-inner halo: widening soft strokes stacked for an additive bloom around the ring.
         for (int i = 5; i >= 1; --i)
         {
@@ -239,9 +239,9 @@ void Orb::paint (juce::Graphics& g)
             g.drawEllipse (c.x - rm, c.y - rm, 2 * rm, 2 * rm, w);
         }
         // Crisp ring: a bright gradient core, lit top-left to a deeper violet bottom-right.
-        juce::ColourGradient ring (theme::recolour (juce::Colour (0xffeadfff)), c.x - rm * 0.7f, c.y - rm * 0.7f,
-                                   theme::recolour (juce::Colour (0xff6f4fe6)), c.x + rm * 0.7f, c.y + rm * 0.85f, false);
-        ring.addColour (0.5, theme::recolour (juce::Colour (0xffc3acff)));
+        juce::ColourGradient ring (theme::orbTint (juce::Colour (0xffeadfff)), c.x - rm * 0.7f, c.y - rm * 0.7f,
+                                   theme::orbTint (juce::Colour (0xff6f4fe6)), c.x + rm * 0.7f, c.y + rm * 0.85f, false);
+        ring.addColour (0.5, theme::orbTint (juce::Colour (0xffc3acff)));
         g.setGradientFill (ring);
         g.setOpacity (juce::jmin (1.0f, 0.82f + 0.18f * lum));
         g.drawEllipse (c.x - rm, c.y - rm, 2 * rm, 2 * rm, 2.8f * U);
@@ -280,11 +280,11 @@ void Orb::paint (juce::Graphics& g)
                 g.setGradientFill (juce::ColourGradient (col.withMultipliedAlpha (glow), at.x, at.y, col.withAlpha (0.0f), at.x + r, at.y, true));
                 g.fillEllipse (at.x - r, at.y - r, 2 * r, 2 * r);
             };
-            blob (sw, 0.42f, rk * 1.05f, theme::recolour (juce::Colour (0xb0802a9c)));         // plum
-            blob (sw + 2.3f, 0.48f, rk * 0.95f, theme::recolour (juce::Colour (0x9a1c8c9c)));  // teal
-            blob (sw + 4.3f, 0.35f, rk * 0.85f, theme::recolour (juce::Colour (0x8a4436d6)));  // violet
-            blob (sw + 1.2f, 0.55f, rk * 0.62f, theme::recolour (juce::Colour (0x7aec4899)));  // hot-pink light leak
-            blob (sw + 3.4f, 0.72f, rk * 0.70f, theme::recolour (juce::Colour (0x886fd0ff)));  // cool blue rim light
+            blob (sw, 0.42f, rk * 1.05f, theme::orbTint (juce::Colour (0xb0802a9c)));         // plum
+            blob (sw + 2.3f, 0.48f, rk * 0.95f, theme::orbTint (juce::Colour (0x9a1c8c9c)));  // teal
+            blob (sw + 4.3f, 0.35f, rk * 0.85f, theme::orbTint (juce::Colour (0x8a4436d6)));  // violet
+            blob (sw + 1.2f, 0.55f, rk * 0.62f, theme::orbTint (juce::Colour (0x7aec4899)));  // hot-pink light leak
+            blob (sw + 3.4f, 0.72f, rk * 0.70f, theme::orbTint (juce::Colour (0x886fd0ff)));  // cool blue rim light
             // Bright nebula heart: a soft white-lavender glow blooming from the centre.
             g.setGradientFill (juce::ColourGradient (juce::Colour (0xffeae4ff).withMultipliedAlpha (0.42f * glow), c.x, c.y - rk * 0.08f,
                                                      juce::Colours::transparentWhite, c.x + rk * 0.9f, c.y, true));
@@ -346,15 +346,39 @@ void Orb::paint (juce::Graphics& g)
         g.fillEllipse (hp.x - 3.5f, y1 - 3.5f, 7.0f, 7.0f);
     }
 
-    // XY handle: grey ball.
-    const float hr = (15.0f + 1.5f * guide.get()) * U;
+    // XY handle. A circular guide ring ("the line") sits around the ball; on hover/drag the ring lights
+    // up white and the ball reads concentric white centre / black / white.
+    const float ga = guide.get();
+    const float hr = (15.0f + 1.5f * ga) * U;
+    const float ringR = hr + 5.0f * U;
     juce::Path hpath;
     hpath.addEllipse (hp.x - hr, hp.y - hr, 2 * hr, 2 * hr);
     juce::DropShadow (juce::Colours::black.withAlpha (0.7f), int (10 * U), { 0, int (3 * U) }).drawForPath (g, hpath);
-    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff8f8f94).brighter (0.15f * guide.get()), hp.x, hp.y - hr, juce::Colour (0xff47474b), hp.x, hp.y + hr, false));
-    g.fillPath (hpath);
-    g.setColour (juce::Colours::white.withAlpha (0.12f));
-    g.strokePath (hpath, juce::PathStrokeType (1.0f));
+    if (ga < 0.999f) // base grey ball, fading out as the hover state ramps in
+    {
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff8f8f94), hp.x, hp.y - hr, juce::Colour (0xff47474b), hp.x, hp.y + hr, false));
+        g.setOpacity (1.0f - ga);
+        g.fillPath (hpath);
+        g.setOpacity (1.0f);
+    }
+    if (ga > 0.001f) // white / black / white rings
+    {
+        const float br = hr - 3.2f * U, wr = hr - 6.4f * U;
+        g.setColour (juce::Colours::white.withAlpha (ga));
+        g.fillEllipse (hp.x - hr, hp.y - hr, 2 * hr, 2 * hr);
+        g.setColour (juce::Colours::black.withAlpha (ga));
+        g.fillEllipse (hp.x - br, hp.y - br, 2 * br, 2 * br);
+        g.setColour (juce::Colours::white.withAlpha (ga));
+        g.fillEllipse (hp.x - wr, hp.y - wr, 2 * wr, 2 * wr);
+    }
+    else
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.strokePath (hpath, juce::PathStrokeType (1.0f));
+    }
+    // The circular guide ring around the ball.
+    g.setColour (juce::Colours::white.withAlpha (0.16f + 0.64f * ga));
+    g.drawEllipse (hp.x - ringR, hp.y - ringR, 2 * ringR, 2 * ringR, 1.2f + 0.8f * ga);
 
     // Doubler axis labels, drawn on top of the ball so it passes behind the text instead of over it.
     if (const float ga = guide; ga > 0.0f)

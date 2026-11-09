@@ -349,11 +349,16 @@ private:
 class ColorPanel : public juce::Component
 {
 public:
-    std::function<void (float hue, float sat, float bright)> onChange;
+    std::function<void (float hue, float sat, float bright)> onChange;          // accent sliders / swatch / preset
+    std::function<void (bool light)> onLight;                                   // light / dark theme
+    std::function<void (bool on, float hueA, float hueB)> onGradient;           // two-colour accent gradient
+    std::function<void (float orb, float key, float meter)> onElements;         // per-element hue offsets
     std::function<void()> onMouseLeave;
 
     void setValues (float h, float s, float b) { hue = h; sat = s; bright = b; repaint(); }
-    int preferredHeight() const { return 214; }
+    void setExtras (bool light, bool grad, float gA, float gB, float orb, float key, float meter)
+    { lightOn = light; gradOn = grad; gradA = gA; gradB = gB; orbH = orb; keyH = key; meterH = meter; repaint(); }
+    int preferredHeight() const { return 356; }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -364,12 +369,16 @@ public:
     static constexpr int kSwatches = 16;
 
 private:
-    juce::Rectangle<float> barFor (int i) const;      // 0 Hue, 1 Saturation, 2 Brightness
+    juce::Rectangle<float> stripRect (int id) const;  // 0 hue 1 sat 2 bright 3 gradA 4 gradB 5 orb 6 key 7 meter
     juce::Rectangle<float> swatchAt (int i) const;
+    juce::Rectangle<float> chipRect (int i) const;    // 0 Light 1 Gradient 2 Default 3 FL 4 Ocean 5 Green
     static float swatchHue (int i) { return float (i) / float (kSwatches); }
     void applyDrag (juce::Point<float>);
+    void applyPreset (float h, float s, float b);
 
     float hue = 0.0f, sat = 1.0f, bright = 1.0f;
+    bool lightOn = false, gradOn = false;
+    float gradA = 0.83f, gradB = 0.58f, orbH = 0.0f, keyH = 0.0f, meterH = 0.0f;
     int drag = -1;
 };
 

@@ -47,6 +47,7 @@ private:
     void refreshGroupBrowser();
     void showBrowser (bool show, int tab = -1); // tabbed Presets/Groups browser from the box icon
     void showColorPanel (bool show);
+    void repaintAll(); // after a theme / colour change: drop cached textures and repaint everything
     void showNotesCard(); // "What's New" overlay
     void showSettingsPanel (bool show);
     void stepPreset (int delta);

@@ -23,6 +23,53 @@ void setAccent (float hue, float saturation, float brightness)
     blackOnBottom = recolour (juce::Colour (base::blackOnBottom));
 }
 
+void setGradient (bool on, juce::Colour a, juce::Colour b)
+{
+    gradientOn = on;
+    gradA = a; gradB = b;
+    if (! on) { setAccent (accentHue, accentSat, accentBright); return; } // restore the hue-rotation palette
+    violet        = a.interpolatedWith (b, 0.5f);
+    violetDeep    = violet.withMultipliedBrightness (0.82f).withMultipliedSaturation (1.1f);
+    pink          = a;
+    coral         = a.interpolatedWith (b, 0.22f);
+    blue          = b;
+    cyan          = a.interpolatedWith (b, 0.78f);
+    lavender      = violet.brighter (0.35f);
+    rose          = a.interpolatedWith (b, 0.4f).withMultipliedSaturation (0.85f);
+    lilac         = violet.brighter (0.55f);
+    amber         = b.brighter (0.2f);
+    warn          = a.brighter (0.2f);
+    keyOnTop      = violet.withMultipliedBrightness (0.9f);
+    keyOnBottom   = lavender;
+    blackOnTop    = violetDeep.withMultipliedBrightness (0.6f);
+    blackOnBottom = violetDeep;
+}
+
+void setTheme (bool light)
+{
+    lightMode = light;
+    if (light)
+    {
+        bg0 = juce::Colour (0xffcdd0d6); bg1 = juce::Colour (0xffeceef2); bg2 = juce::Colour (0xffe4e6eb);
+        bg3 = juce::Colour (0xffd4d7de); line = juce::Colour (0xffbfc2cb);
+        text = juce::Colour (0xff1b1c20); textDim = juce::Colour (0xff5c5e68); textFaint = juce::Colour (0xff9a9ca6);
+        header = juce::Colour (0xffe4e6eb); headerBox = juce::Colour (0xffeceef2); stage = juce::Colour (0xffe8eaef);
+        highlight = juce::Colour (0xfff4f6fa); panel = juce::Colour (0xffe0e3e9); knobBody = juce::Colour (0xffe8eaee);
+        menuBg = juce::Colour (0xfff5f6f9); menuBg2 = juce::Colour (0xffe4e6ea); menuSel = juce::Colour (0xffdcdee5);
+        menuTab = juce::Colour (0xffe9ebf0); well = juce::Colour (0xffd8dae1);
+    }
+    else
+    {
+        bg0 = juce::Colour (0xff0d0e10); bg1 = juce::Colour (0xff121316); bg2 = juce::Colour (0xff17181c);
+        bg3 = juce::Colour (0xff24262d); line = juce::Colour (0xff2e3038);
+        text = juce::Colour (0xfff2f1f7); textDim = juce::Colour (0xffa09eac); textFaint = juce::Colour (0xff5f5d6b);
+        header = juce::Colour (0xff17181c); headerBox = juce::Colour (0xff121316); stage = juce::Colour (0xff121316);
+        highlight = juce::Colour (0xff1e2026); panel = juce::Colour (0xff1e2026); knobBody = juce::Colour (0xff18191c);
+        menuBg = juce::Colour (0xff1c1c1e); menuBg2 = juce::Colour (0xff121213); menuSel = juce::Colour (0xff252528);
+        menuTab = juce::Colour (0xff232327); well = juce::Colour (0xff141416);
+    }
+}
+
 juce::Font font (float height, bool semibold)
 {
     // Embedded Inter (SIL OFL): identical rendering regardless of fonts present in the Wine prefix.

@@ -21,7 +21,7 @@ MetaTuneLookAndFeel::MetaTuneLookAndFeel()
 void MetaTuneLookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int w, int h)
 {
     // Same card as the preset panel: near-black with a faint edge.
-    g.fillAll (juce::Colour (0xff1c1c1e));
+    g.fillAll (theme::menuBg);
     g.setColour (juce::Colours::white.withAlpha (0.08f));
     g.drawRect (0, 0, w, h);
 }

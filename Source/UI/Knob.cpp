@@ -125,24 +125,59 @@ void Knob::paint (juce::Graphics& g)
         }
     }
 
+    if (style.smoothArc)
+    {
+        // Slim, smooth progress arc (bipolar: fills out from the 12-o'clock centre both ways).
+        const float rm = R * 0.82f, bw = juce::jmax (3.0f, R * 0.075f);
+        const float a0 = rad (style.startDeg), a1 = rad (style.endDeg);
+        auto ang = [&] (float p) { return a0 + (a1 - a0) * p; };
+        juce::Path track;
+        track.addCentredArc (c.x, c.y, rm, rm, 0.0f, a0, a1, true);
+        g.setColour (juce::Colours::white.withAlpha (hot ? 0.13f : 0.08f));
+        g.strokePath (track, juce::PathStrokeType (bw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+        const float base = style.bipolar ? float (valueToProportionOfLength (0.0)) : 0.0f;
+        if (std::abs (t - base) > 1.5e-3f)
+        {
+            const float lo = juce::jmin (base, t), hi = juce::jmax (base, t);
+            juce::Path lit;
+            lit.addCentredArc (c.x, c.y, rm, rm, 0.0f, ang (lo), ang (hi), true);
+            const juce::Point<float> pa (c.x - R, c.y), pb (c.x + R, c.y);
+            juce::ColourGradient grad (lavender, pa, violet.brighter (0.1f), pb, false);
+            grad.addColour (0.5, lilac.interpolatedWith (violet, 0.4f));
+            if (activity > 0.01f)
+            {
+                g.setColour (violet.withAlpha (0.35f * activity));
+                g.strokePath (lit, juce::PathStrokeType (bw * (1.0f + 1.2f * activity), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+            g.setGradientFill (grad);
+            g.strokePath (lit, juce::PathStrokeType (bw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            const float at = ang (t);
+            const juce::Point<float> mp (c.x + rm * std::sin (at), c.y - rm * std::cos (at));
+            g.setColour (juce::Colours::white);
+            g.fillEllipse (mp.x - bw * 0.52f, mp.y - bw * 0.52f, bw * 1.04f, bw * 1.04f);
+        }
+    }
+
     // Inner disc.
-    const float ri = style.ticks ? R * 0.63f : R * 0.86f;
+    const bool compact = style.ticks || style.smoothArc;
+    const float ri = style.ticks ? R * 0.63f : (style.smoothArc ? R * 0.70f : R * 0.86f);
     g.setGradientFill (juce::ColourGradient (knobBody.brighter (0.10f), c.x, c.y - ri, juce::Colour (0xff0c0d0f), c.x, c.y + ri, false));
     g.fillEllipse (c.x - ri, c.y - ri, 2 * ri, 2 * ri);
     g.setColour (juce::Colours::white.withAlpha (0.05f + 0.07f * hv));
     g.drawEllipse (c.x - ri + 0.5f, c.y - ri + 0.5f, 2 * ri - 1, 2 * ri - 1, 1.0f);
 
     // Readout and label. The readout digits scale with lcdH; keep them clearly larger than the label.
-    const float lcdH = style.ticks ? R * 0.30f : R * 0.24f;
-    const float lcdY = style.ticks ? c.y - R * 0.21f : c.y - R * 0.24f;
+    const float lcdH = compact ? R * 0.30f : R * 0.24f;
+    const float lcdY = compact ? c.y - R * 0.21f : c.y - R * 0.24f;
     const auto readout = format (getValue());
     drawSevenSeg (g, readout, { c.x - ri, lcdY + 1.8f, 2 * ri, lcdH }, style.cells,      // drop shadow
                   juce::Colours::black.withAlpha (0.55f), juce::Colours::transparentBlack, style.centreReadout);
     drawSevenSeg (g, readout, { c.x - ri, lcdY, 2 * ri, lcdH }, style.cells,
                   text.interpolatedWith (lavender.interpolatedWith (violet, 0.35f), turning.get()), juce::Colours::white.withAlpha (0.05f), style.centreReadout);
-    g.setFont (font (juce::jmax (11.0f, R * (style.ticks ? 0.135f : 0.22f)), true));
+    g.setFont (font (juce::jmax (11.0f, R * (compact ? 0.135f : 0.22f)), true));
     shadowText (g, hot && style.unit.isNotEmpty() ? style.unit : label,
-                juce::Rectangle<float> (c.x - ri + style.labelDx * R, lcdY + lcdH + R * 0.08f, 2 * ri, R * (style.ticks ? 0.16f : 0.26f)),
+                juce::Rectangle<float> (c.x - ri + style.labelDx * R, lcdY + lcdH + R * 0.08f, 2 * ri, R * (compact ? 0.16f : 0.26f)),
                 juce::Justification::centred, text.withAlpha (0.92f));
 }
 

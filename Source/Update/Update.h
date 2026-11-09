@@ -46,6 +46,19 @@ struct Settings
     static float accentSat();
     static float accentBright();
     static void setAccentPrefs (float hue, float sat, float bright);
+    // Light / dark theme (global).
+    static bool lightMode();
+    static void setLightMode (bool);
+    // Two-colour accent gradient: on + the two endpoint hues (0..1).
+    static bool gradientOn();
+    static float gradHueA();
+    static float gradHueB();
+    static void setGradient (bool on, float hueA, float hueB);
+    // Per-element hue offsets (0..1 extra rotation) for the orb, keyboard and meters.
+    static float orbHue();
+    static float keyHue();
+    static float meterHue();
+    static void setElementHues (float orb, float key, float meter);
     // Favourite presets (global): a set of folder+name keys, toggled from the preset browser.
     static bool isFavorite (const juce::String& folder, const juce::String& name);
     static void setFavorite (const juce::String& folder, const juce::String& name, bool on);

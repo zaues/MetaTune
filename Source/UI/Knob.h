@@ -17,6 +17,8 @@ public:
         juce::String unit;                         // shown in place of the label while hovering/dragging
         float labelDx = 0.0f;                      // horizontal nudge of the label, as a fraction of the radius
         bool centreReadout = false;                // centre the value instead of right-aligning it in the cells
+        bool smoothArc = false;                    // slim continuous progress arc instead of discrete ticks
+        bool bipolar = false;                      // smoothArc fills out from the centre (value 0) both ways
     };
 
     Knob (juce::String label, std::function<juce::String (double)> format, Style);

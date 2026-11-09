@@ -6,6 +6,14 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.5.0",
+      "- Light mode: a full light theme. Toggle it from the colour panel (the palette button).\n"
+      "- Gradient accent: pick two colours and MetaTune blends them across the orb, meters and keys.\n"
+      "- Theme presets: one-click FL, Ocean, Green and Default looks in the colour panel.\n"
+      "- Per-element colour: give the orb, keys and meters their own hue.\n"
+      "- The Sustain knob now shows a slim, smooth bipolar arc that fills out from the centre.\n"
+      "- The Doubler handle has a circular guide ring that lights up white on hover, with a white/black/white centre.\n"
+      "- The preset/groups browser now slides in from the left." },
     { "0.4.2",
       "- The box icon slides its browser open and now greys out while the browser is showing, like a selected tab.\n"
       "- New preset-browser toolbar: New preset, New folder, Search (filter by name), Open folder and Favourites.\n"

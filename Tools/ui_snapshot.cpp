@@ -2,6 +2,7 @@
 // Feeds the processor a synthetic, slightly sharp harmonic tone so the visualisers show real DSP data.
 // usage: ui_snapshot.exe <out-dir> [scale] [major|bypass|silent]
 #include "../Source/PluginProcessor.h"
+#include "../Source/UI/Theme.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter();
@@ -28,6 +29,7 @@ int main (int argc, char** argv)
 
     std::unique_ptr<juce::AudioProcessorEditor> ed (proc->createEditorAndMakeActive());
     ed->setSize (juce::roundToInt (1082 * scale), juce::roundToInt (856 * scale));
+    if (mode == "light") theme::setTheme (true); // forced for visual review (snapshot ignores saved prefs)
 
     const double amp = mode == "silent" ? 0.0 : 0.2; // "silent": no input, so voice-driven visuals stay off
     // E4 + 28 cents with vibrato-free harmonics, ~1 s, interleaved with message-loop time so timers run.

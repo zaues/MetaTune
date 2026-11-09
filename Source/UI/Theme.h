@@ -7,21 +7,31 @@ namespace theme
 // Header wordmark: two-part logotype ("meta" light + "Tune" semibold).
 inline const juce::String wordmarkA { "meta" }, wordmarkB { "Tune" };
 
-inline const juce::Colour bg0 { 0xff0d0e10 };   // deepest (strips, wells, heat rows)
-inline const juce::Colour bg1 { 0xff121316 };   // window: obsidian
-inline const juce::Colour bg2 { 0xff17181c };   // raised panels, mode row
-inline const juce::Colour bg3 { 0xff24262d };   // controls, hover
-inline const juce::Colour line { 0xff2e3038 };  // 1 px borders
-inline const juce::Colour text { 0xfff2f1f7 };
-inline const juce::Colour textDim { 0xffa09eac };
-inline const juce::Colour textFaint { 0xff5f5d6b };
+// Neutral surface palette. MUTABLE: setTheme() swaps the whole set between the dark and light
+// themes at runtime. Draw surfaces with these tokens (never inline hex) so light mode works.
+inline juce::Colour bg0 { 0xff0d0e10 };   // deepest (strips, wells, heat rows)
+inline juce::Colour bg1 { 0xff121316 };   // window: obsidian
+inline juce::Colour bg2 { 0xff17181c };   // raised panels, mode row
+inline juce::Colour bg3 { 0xff24262d };   // controls, hover
+inline juce::Colour line { 0xff2e3038 };  // 1 px borders
+inline juce::Colour text { 0xfff2f1f7 };
+inline juce::Colour textDim { 0xffa09eac };
+inline juce::Colour textFaint { 0xff5f5d6b };
 
-inline const juce::Colour header { 0xff17181c };    // header bar
-inline const juce::Colour headerBox { 0xff121316 }; // header cells (preset box, title)
-inline const juce::Colour stage { 0xff121316 };     // stage behind the orb
-inline const juce::Colour highlight { 0xff1e2026 }; // soft radial highlights on the background
-inline const juce::Colour panel { 0xff1e2026 };     // brushed-metal panel behind the knobs
-inline const juce::Colour knobBody { 0xff18191c };
+inline juce::Colour header { 0xff17181c };    // header bar
+inline juce::Colour headerBox { 0xff121316 }; // header cells (preset box, title)
+inline juce::Colour stage { 0xff121316 };     // stage behind the orb
+inline juce::Colour highlight { 0xff1e2026 }; // soft radial highlights on the background
+inline juce::Colour panel { 0xff1e2026 };     // brushed-metal panel behind the knobs
+inline juce::Colour knobBody { 0xff18191c };
+inline juce::Colour menuBg { 0xff1c1c1e };    // dropdown / browser panel surface
+inline juce::Colour menuBg2 { 0xff121213 };   // group-tab rail, deepest menu surface
+inline juce::Colour menuSel { 0xff252528 };   // selected / highlighted menu row
+inline juce::Colour menuTab { 0xff232327 };   // browser tab strip
+inline juce::Colour well { 0xff141416 };      // text fields, slider tracks
+
+inline bool lightMode = false;
+void setTheme (bool light); // swap the neutral palette (keeps the current accent)
 
 // The signature accent palette. These are MUTABLE: setAccent() recolours the whole family at runtime
 // (hue rotation + saturation/brightness) so the user can change the plugin's colour. Their originals
@@ -63,17 +73,31 @@ inline juce::Colour recolour (juce::Colour c)
 // hue 0..1 (fraction of a full turn), saturation/brightness are multipliers around 1.
 void setAccent (float hue, float saturation, float brightness);
 
+// Two-colour accent gradient override. When on, the whole accent family and accentAt()/tickColourAt()
+// are built from these two endpoint colours instead of the hue-rotation palette.
+inline bool gradientOn = false;
+inline juce::Colour gradA { 0xffec4899 }, gradB { 0xff6aa8ff };
+void setGradient (bool on, juce::Colour a, juce::Colour b);
+
+// Per-element extra hue rotation (orb / keyboard / meters), applied on top of the accent (0 = none).
+inline float orbHue = 0.0f, keyHue = 0.0f, meterHue = 0.0f;
+inline juce::Colour tint (juce::Colour c, float extraHue) { return extraHue == 0.0f ? c : c.withRotatedHue (extraHue); }
+inline juce::Colour orbTint (juce::Colour c) { return tint (recolour (c), orbHue); } // recolour + the orb's own hue offset
+
 // Meter tracks: hot pink/coral -> bright cyan -> deep violet along the sweep (u = 0..1).
 inline juce::Colour tickColourAt (float u)
 {
     u = juce::jlimit (0.0f, 1.0f, u);
-    return u < 0.5f ? coral.interpolatedWith (cyan, u * 2.0f) : cyan.interpolatedWith (violetDeep.brighter (0.2f), (u - 0.5f) * 2.0f);
+    const juce::Colour c = gradientOn ? gradA.interpolatedWith (gradB, u)
+        : (u < 0.5f ? coral.interpolatedWith (cyan, u * 2.0f) : cyan.interpolatedWith (violetDeep.brighter (0.2f), (u - 0.5f) * 2.0f));
+    return tint (c, meterHue);
 }
 
 // Position 0..1 along the signature pink -> violet -> blue gradient.
 inline juce::Colour accentAt (float t)
 {
     t = juce::jlimit (0.0f, 1.0f, t);
+    if (gradientOn) return gradA.interpolatedWith (gradB, t);
     return t < 0.5f ? pink.interpolatedWith (violet, t * 2.0f) : violet.interpolatedWith (blue, (t - 0.5f) * 2.0f);
 }
 
@@ -86,7 +110,7 @@ inline void shadowText (juce::Graphics& g, const juce::String& t, RectType area,
                         juce::Justification j, juce::Colour colour, float dy = 1.6f, float alpha = 0.7f)
 {
     const auto a = area.toFloat();
-    const float sh = alpha * colour.getFloatAlpha(); // shadow fades with the text (so faded text leaves no black residue)
+    const float sh = alpha * colour.getFloatAlpha() * (lightMode ? 0.3f : 1.0f); // shadow fades with the text; lighter in light mode
     // Two passes: a softer, lower one for spread, then the main shadow, then the text.
     g.setColour (juce::Colours::black.withAlpha (sh * 0.5f));
     g.drawText (t, a.translated (0.0f, dy + 1.0f), j);
@@ -100,7 +124,7 @@ inline void shadowFittedText (juce::Graphics& g, const juce::String& t, RectType
                               juce::Justification j, int maxLines, juce::Colour colour, float alpha = 0.7f)
 {
     const auto a = area.toFloat().toNearestInt();
-    const float sh = alpha * colour.getFloatAlpha();
+    const float sh = alpha * colour.getFloatAlpha() * (lightMode ? 0.3f : 1.0f);
     g.setColour (juce::Colours::black.withAlpha (sh * 0.5f));
     g.drawFittedText (t, a.translated (0, 3), j, maxLines);
     g.setColour (juce::Colours::black.withAlpha (sh));

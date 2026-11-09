@@ -119,6 +119,31 @@ void Settings::setAccentPrefs (float hue, float sat, float bright)
     props().saveIfNeeded();
 }
 
+bool Settings::lightMode() { return props().getBoolValue ("lightMode", false); }
+void Settings::setLightMode (bool on) { props().setValue ("lightMode", on); props().saveIfNeeded(); }
+
+bool  Settings::gradientOn() { return props().getBoolValue ("gradientOn", false); }
+float Settings::gradHueA()   { return (float) props().getDoubleValue ("gradHueA", 0.83); }
+float Settings::gradHueB()   { return (float) props().getDoubleValue ("gradHueB", 0.58); }
+void  Settings::setGradient (bool on, float hueA, float hueB)
+{
+    props().setValue ("gradientOn", on);
+    props().setValue ("gradHueA", hueA);
+    props().setValue ("gradHueB", hueB);
+    props().saveIfNeeded();
+}
+
+float Settings::orbHue()   { return (float) props().getDoubleValue ("orbHue", 0.0); }
+float Settings::keyHue()   { return (float) props().getDoubleValue ("keyHue", 0.0); }
+float Settings::meterHue() { return (float) props().getDoubleValue ("meterHue", 0.0); }
+void  Settings::setElementHues (float orb, float key, float meter)
+{
+    props().setValue ("orbHue", orb);
+    props().setValue ("keyHue", key);
+    props().setValue ("meterHue", meter);
+    props().saveIfNeeded();
+}
+
 static juce::String favKey (const juce::String& folder, const juce::String& name) { return folder + "\t" + name; }
 
 bool Settings::isFavorite (const juce::String& folder, const juce::String& name)

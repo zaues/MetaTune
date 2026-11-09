@@ -329,13 +329,13 @@ void GroupTabs::paint (juce::Graphics& g)
     const auto b = getLocalBounds().toFloat();
     juce::Path bg;
     bg.addRoundedRectangle (b.getX() - 12.0f, b.getY(), b.getWidth() + 12.0f, b.getHeight(), 12.0f);
-    g.setColour (juce::Colour (0xff121213));
+    g.setColour (theme::menuBg2);
     g.fillPath (bg);
     // Box (grid) icon: a grey "selected" fill sits behind it while its browser is open, like the number tabs.
     const auto boxCell = juce::Rectangle<float> (b.getX(), b.getY() + 4.0f, b.getWidth(), float (kTop) - 8.0f);
     if (browseActive)
     {
-        g.setColour (juce::Colour (0xff252528));
+        g.setColour (theme::menuSel);
         g.fillRoundedRectangle (boxCell.reduced (5.0f, 0.0f), 6.0f);
         g.setColour (juce::Colour (0xffc9ccd4).withAlpha (0.8f));
         g.fillRect (boxCell.getX() + 5.0f, boxCell.getY() + 6.0f, 2.0f, boxCell.getHeight() - 12.0f);
@@ -352,7 +352,7 @@ void GroupTabs::paint (juce::Graphics& g)
         const float sa = selAmt[i], ha = hoverAmt[i];
         if (sa > 0.0f || ha > 0.0f)
         {
-            g.setColour (juce::Colour (0xff121213).interpolatedWith (juce::Colour (0xff1c1c1e), ha).interpolatedWith (juce::Colour (0xff252528), sa));
+            g.setColour (theme::menuBg2.interpolatedWith (theme::menuBg, ha).interpolatedWith (theme::menuSel, sa));
             g.fillRect (r.reduced (0.0f, 1.0f));
             g.setColour (juce::Colour (0xffc9ccd4).withAlpha (0.8f * sa));
             g.fillRect (r.getX(), r.getY() + 6.0f, 2.0f, r.getHeight() - 12.0f);
@@ -453,7 +453,7 @@ void ToneSlider::paint (juce::Graphics& g)
     const auto track = getLocalBounds().toFloat().withSizeKeepingCentre (float (getWidth()), 14.0f);
     const float x = track.getX() + 3.0f + float (valueToProportionOfLength (getValue())) * (track.getWidth() - 6.0f);
     // Empty dark track; the red fill grows from the left up to the handle, so it follows the volume.
-    g.setColour (juce::Colour (0xff141416));
+    g.setColour (theme::well);
     g.fillRoundedRectangle (track, 3.0f);
     {
         juce::Graphics::ScopedSaveState s (g);
@@ -614,7 +614,7 @@ PresetPanel::PresetPanel()
 {
     addChildComponent (searchBox);
     searchBox.setTextToShowWhenEmpty ("Search presets", theme::textDim);
-    searchBox.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff141416));
+    searchBox.setColour (juce::TextEditor::backgroundColourId, theme::well);
     searchBox.setColour (juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha (0.12f));
     searchBox.setColour (juce::TextEditor::focusedOutlineColourId, theme::violet.withAlpha (0.7f));
     searchBox.setColour (juce::TextEditor::textColourId, theme::text);
@@ -821,7 +821,7 @@ void PresetPanel::paint (juce::Graphics& g)
     juce::Path bg;
     bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), 8.0f, 8.0f, false, false, true, true);
     juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 16, { 0, 4 }).drawForPath (g, bg);
-    g.setColour (juce::Colour (0xff1c1c1e));
+    g.setColour (theme::menuBg);
     g.fillPath (bg);
     g.setColour (juce::Colours::white.withAlpha (0.07f));
     g.strokePath (bg, juce::PathStrokeType (1.0f));
@@ -1045,7 +1045,7 @@ void GroupBrowser::paint (juce::Graphics& g)
     juce::Path bg;
     bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), 8.0f, 8.0f);
     juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 18, { 0, 4 }).drawForPath (g, bg);
-    g.setColour (juce::Colour (0xff1c1c1e));
+    g.setColour (theme::menuBg);
     g.fillPath (bg);
     g.setColour (juce::Colours::white.withAlpha (0.07f));
     g.strokePath (bg, juce::PathStrokeType (1.0f));
@@ -1179,7 +1179,7 @@ void SavePresetCard::paint (juce::Graphics& g)
     juce::Path p;
     p.addRoundedRectangle (c, 10.0f);
     juce::DropShadow (juce::Colours::black.withAlpha (0.7f), 24, { 0, 6 }).drawForPath (g, p);
-    g.setColour (juce::Colour (0xff1c1c1e));
+    g.setColour (theme::menuBg);
     g.fillPath (p);
     g.setColour (juce::Colours::white.withAlpha (0.08f));
     g.strokePath (p, juce::PathStrokeType (1.0f));
@@ -1233,7 +1233,7 @@ void SettingsPanel::paint (juce::Graphics& g)
     juce::Path bg;
     bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), 8.0f, 8.0f, false, false, true, true);
     juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 16, { 0, 4 }).drawForPath (g, bg);
-    g.setColour (juce::Colour (0xff1c1c1e));
+    g.setColour (theme::menuBg);
     g.fillPath (bg);
     g.setColour (juce::Colours::white.withAlpha (0.07f));
     g.strokePath (bg, juce::PathStrokeType (1.0f));
@@ -1419,9 +1419,17 @@ void ReleaseNotesCard::mouseWheelMove (const juce::MouseEvent& e, const juce::Mo
 
 static constexpr float kSatMin = 0.4f, kSatMax = 1.6f, kBriMin = 0.6f, kBriMax = 1.3f;
 
-juce::Rectangle<float> ColorPanel::barFor (int i) const
+// Strip Y positions by id: 0 hue 1 sat 2 bright | 3 gradA 4 gradB | 5 orb 6 key 7 meter.
+static float stripY (int id)
 {
-    return { 66.0f, 16.0f + float (i) * 30.0f, float (getWidth()) - 66.0f - 14.0f, 10.0f };
+    switch (id) { case 0: return 14; case 1: return 40; case 2: return 66;
+                  case 3: return 226; case 4: return 250;
+                  case 5: return 284; case 6: return 308; default: return 332; }
+}
+
+juce::Rectangle<float> ColorPanel::stripRect (int id) const
+{
+    return { 58.0f, stripY (id), float (getWidth()) - 58.0f - 14.0f, 10.0f };
 }
 
 juce::Rectangle<float> ColorPanel::swatchAt (int i) const
@@ -1429,7 +1437,31 @@ juce::Rectangle<float> ColorPanel::swatchAt (int i) const
     const int cols = 8;
     const float gap = 6.0f, sw = (float (getWidth()) - 28.0f - gap * float (cols - 1)) / float (cols);
     const int col = i % cols, row = i / cols;
-    return { 14.0f + float (col) * (sw + gap), 118.0f + float (row) * (sw + gap), sw, sw };
+    return { 14.0f + float (col) * (sw + gap), 92.0f + float (row) * (sw + gap), sw, sw };
+}
+
+juce::Rectangle<float> ColorPanel::chipRect (int i) const
+{
+    const float gap = 8.0f, x0 = 14.0f, w = (float (getWidth()) - 28.0f - gap * 2.0f) / 3.0f, h = 22.0f;
+    const int col = i % 3, row = i / 3;
+    return { x0 + float (col) * (w + gap), 156.0f + float (row) * (h + 6.0f), w, h };
+}
+
+// A horizontal strip: full-spectrum hue ramp with a white handle at value (0..1). dim = inactive.
+static void drawHueStrip (juce::Graphics& g, juce::Rectangle<float> bar, float value, bool dim)
+{
+    juce::ColourGradient grad (juce::Colour::fromHSV (0.0f, 0.8f, 1.0f, 1.0f), bar.getX(), 0.0f,
+                               juce::Colour::fromHSV (1.0f, 0.8f, 1.0f, 1.0f), bar.getRight(), 0.0f, false);
+    for (float t = 0.125f; t < 1.0f; t += 0.125f) grad.addColour (t, juce::Colour::fromHSV (t, 0.8f, 1.0f, 1.0f));
+    g.setGradientFill (grad);
+    g.setOpacity (dim ? 0.4f : 1.0f);
+    g.fillRoundedRectangle (bar, bar.getHeight() * 0.5f);
+    g.setOpacity (1.0f);
+    const float hx = bar.getX() + juce::jlimit (0.0f, 1.0f, value) * bar.getWidth();
+    g.setColour (juce::Colours::white.withAlpha (dim ? 0.6f : 1.0f));
+    g.fillEllipse (hx - 6.0f, bar.getCentreY() - 6.0f, 12.0f, 12.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.35f));
+    g.drawEllipse (hx - 6.0f, bar.getCentreY() - 6.0f, 12.0f, 12.0f, 1.0f);
 }
 
 void ColorPanel::paint (juce::Graphics& g)
@@ -1439,55 +1471,114 @@ void ColorPanel::paint (juce::Graphics& g)
     juce::Path bg;
     bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), 8.0f, 8.0f, false, false, true, true);
     juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 16, { 0, 4 }).drawForPath (g, bg);
-    g.setColour (juce::Colour (0xff1c1c1e)); g.fillPath (bg);
+    g.setColour (theme::menuBg); g.fillPath (bg);
     g.setColour (juce::Colours::white.withAlpha (0.07f)); g.strokePath (bg, juce::PathStrokeType (1.0f));
 
-    const char* names[] = { "Hue", "Saturation", "Bright" };
+    const auto mouse = getMouseXYRelative().toFloat();
+    auto label = [&] (const juce::String& t, float y, juce::Colour c)
+    {
+        g.setFont (font (12.0f, true));
+        shadowText (g, t, juce::Rectangle<float> (12.0f, y - 9.0f, 46.0f, 18.0f), juce::Justification::centredLeft, c);
+    };
+
+    // --- Accent: Hue / Saturation / Bright. Dimmed while a gradient drives the accent.
+    const char* anames[] = { "Hue", "Sat", "Bright" };
     const float frac[] = { hue, (sat - kSatMin) / (kSatMax - kSatMin), (bright - kBriMin) / (kBriMax - kBriMin) };
     for (int i = 0; i < 3; ++i)
     {
-        const auto bar = barFor (i);
-        g.setFont (font (12.0f, true));
-        shadowText (g, names[i], juce::Rectangle<float> (12.0f, bar.getCentreY() - 9.0f, 52.0f, 18.0f), juce::Justification::centredLeft, textDim);
-        if (i == 0)
-        {
-            juce::ColourGradient grad (juce::Colour::fromHSV (0.0f, 0.8f, 1.0f, 1.0f), bar.getX(), 0.0f,
-                                       juce::Colour::fromHSV (1.0f, 0.8f, 1.0f, 1.0f), bar.getRight(), 0.0f, false);
-            for (float t = 0.125f; t < 1.0f; t += 0.125f) grad.addColour (t, juce::Colour::fromHSV (t, 0.8f, 1.0f, 1.0f));
-            g.setGradientFill (grad);
-        }
-        else if (i == 1)
-            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff6b6b70), bar.getX(), 0.0f,
-                                                     juce::Colour (theme::base::violet).withRotatedHue (hue), bar.getRight(), 0.0f, false));
+        const auto bar = stripRect (i);
+        label (anames[i], bar.getCentreY(), gradOn ? textFaint : textDim);
+        if (i == 0) { drawHueStrip (g, bar, frac[0], gradOn); }
         else
-            g.setGradientFill (juce::ColourGradient (juce::Colours::black, bar.getX(), 0.0f, juce::Colours::white, bar.getRight(), 0.0f, false));
-        g.fillRoundedRectangle (bar, bar.getHeight() * 0.5f);
-        const float hx = bar.getX() + juce::jlimit (0.0f, 1.0f, frac[i]) * bar.getWidth();
-        g.setColour (juce::Colours::white);
-        g.fillEllipse (hx - 6.0f, bar.getCentreY() - 6.0f, 12.0f, 12.0f);
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
-        g.drawEllipse (hx - 6.0f, bar.getCentreY() - 6.0f, 12.0f, 12.0f, 1.0f);
+        {
+            if (i == 1) g.setGradientFill (juce::ColourGradient (juce::Colour (0xff6b6b70), bar.getX(), 0.0f,
+                                                                 juce::Colour (theme::base::violet).withRotatedHue (hue), bar.getRight(), 0.0f, false));
+            else        g.setGradientFill (juce::ColourGradient (juce::Colours::black, bar.getX(), 0.0f, juce::Colours::white, bar.getRight(), 0.0f, false));
+            g.setOpacity (gradOn ? 0.4f : 1.0f);
+            g.fillRoundedRectangle (bar, bar.getHeight() * 0.5f);
+            g.setOpacity (1.0f);
+            const float hx = bar.getX() + juce::jlimit (0.0f, 1.0f, frac[i]) * bar.getWidth();
+            g.setColour (juce::Colours::white.withAlpha (gradOn ? 0.6f : 1.0f));
+            g.fillEllipse (hx - 6.0f, bar.getCentreY() - 6.0f, 12.0f, 12.0f);
+            g.setColour (juce::Colours::black.withAlpha (0.35f));
+            g.drawEllipse (hx - 6.0f, bar.getCentreY() - 6.0f, 12.0f, 12.0f, 1.0f);
+        }
     }
 
-    const auto mouse = getMouseXYRelative().toFloat();
+    // --- Swatches
     for (int i = 0; i < kSwatches; ++i)
     {
         const auto s = swatchAt (i);
         g.setColour (juce::Colour (theme::base::violet).withRotatedHue (swatchHue (i)));
         g.fillRoundedRectangle (s, 5.0f);
-        const bool sel = std::abs (hue - swatchHue (i)) < 0.5f / float (kSwatches);
+        const bool sel = ! gradOn && std::abs (hue - swatchHue (i)) < 0.5f / float (kSwatches);
         g.setColour (juce::Colours::white.withAlpha (sel ? 0.95f : (s.contains (mouse) ? 0.55f : 0.14f)));
         g.drawRoundedRectangle (s.reduced (0.5f), 5.0f, sel ? 2.0f : 1.0f);
     }
+
+    // --- Chips: Light / Gradient toggles, then Default / FL / Ocean / Green presets.
+    const char* clabels[] = { "Light", "Gradient", "Default", "FL", "Ocean", "Green" };
+    const bool active[] = { lightOn, gradOn, false, false, false, false };
+    for (int i = 0; i < 6; ++i)
+    {
+        const auto c = chipRect (i);
+        const bool hot = c.contains (mouse);
+        g.setColour (active[i] ? violet.withAlpha (0.92f) : menuSel.withAlpha (hot ? 1.0f : 0.65f));
+        g.fillRoundedRectangle (c, 5.0f);
+        if (! active[i]) { g.setColour (juce::Colours::white.withAlpha (hot ? 0.3f : 0.1f)); g.drawRoundedRectangle (c.reduced (0.5f), 5.0f, 1.0f); }
+        g.setFont (font (11.5f, true));
+        shadowText (g, clabels[i], c, juce::Justification::centred, active[i] ? juce::Colours::white : textDim.interpolatedWith (text, hot ? 1.0f : 0.5f));
+    }
+
+    // --- Gradient endpoints
+    g.setFont (font (10.5f, true));
+    shadowText (g, "GRADIENT", juce::Rectangle<float> (12.0f, 206.0f, 160.0f, 14.0f), juce::Justification::centredLeft, textFaint.brighter (0.15f));
+    label ("A", stripRect (3).getCentreY(), gradOn ? textDim : textFaint);
+    drawHueStrip (g, stripRect (3), gradA, ! gradOn);
+    label ("B", stripRect (4).getCentreY(), gradOn ? textDim : textFaint);
+    drawHueStrip (g, stripRect (4), gradB, ! gradOn);
+    { // a little preview of the current gradient
+        const auto pv = juce::Rectangle<float> (float (getWidth()) - 52.0f, 206.0f, 38.0f, 14.0f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour::fromHSV (gradA, 0.85f, 1.0f, 1.0f), pv.getX(), 0.0f,
+                                                 juce::Colour::fromHSV (gradB, 0.85f, 1.0f, 1.0f), pv.getRight(), 0.0f, false));
+        g.fillRoundedRectangle (pv, 3.0f);
+    }
+
+    // --- Per-element hue offsets
+    g.setFont (font (10.5f, true));
+    shadowText (g, "PER-ELEMENT", juce::Rectangle<float> (12.0f, 272.0f - 10.0f, 160.0f, 14.0f), juce::Justification::centredLeft, textFaint.brighter (0.15f));
+    label ("Orb", stripRect (5).getCentreY(), textDim);
+    drawHueStrip (g, stripRect (5), orbH, false);
+    label ("Keys", stripRect (6).getCentreY(), textDim);
+    drawHueStrip (g, stripRect (6), keyH, false);
+    label ("Mtr", stripRect (7).getCentreY(), textDim);
+    drawHueStrip (g, stripRect (7), meterH, false);
 }
 
 void ColorPanel::applyDrag (juce::Point<float> p)
 {
-    const auto bar = barFor (drag);
+    const auto bar = stripRect (drag);
     const float t = juce::jlimit (0.0f, 1.0f, (p.x - bar.getX()) / bar.getWidth());
-    if (drag == 0) hue = t;
-    else if (drag == 1) sat = kSatMin + t * (kSatMax - kSatMin);
-    else bright = kBriMin + t * (kBriMax - kBriMin);
+    switch (drag)
+    {
+        case 0: hue = t; if (onChange) onChange (hue, sat, bright); break;
+        case 1: sat = kSatMin + t * (kSatMax - kSatMin); if (onChange) onChange (hue, sat, bright); break;
+        case 2: bright = kBriMin + t * (kBriMax - kBriMin); if (onChange) onChange (hue, sat, bright); break;
+        case 3: gradA = t; gradOn = true; if (onGradient) onGradient (true, gradA, gradB); break;
+        case 4: gradB = t; gradOn = true; if (onGradient) onGradient (true, gradA, gradB); break;
+        case 5: orbH = t; if (onElements) onElements (orbH, keyH, meterH); break;
+        case 6: keyH = t; if (onElements) onElements (orbH, keyH, meterH); break;
+        case 7: meterH = t; if (onElements) onElements (orbH, keyH, meterH); break;
+        default: break;
+    }
+    repaint();
+}
+
+void ColorPanel::applyPreset (float h, float s, float b)
+{
+    gradOn = false;
+    if (onGradient) onGradient (false, gradA, gradB);
+    hue = h; sat = s; bright = b;
     if (onChange) onChange (hue, sat, bright);
     repaint();
 }
@@ -1495,13 +1586,23 @@ void ColorPanel::applyDrag (juce::Point<float> p)
 void ColorPanel::mouseDown (const juce::MouseEvent& e)
 {
     drag = -1;
-    for (int i = 0; i < 3; ++i)
-        if (barFor (i).expanded (6.0f, 9.0f).contains (e.position)) { drag = i; applyDrag (e.position); return; }
+    for (int i = 0; i < 8; ++i)
+        if (stripRect (i).expanded (6.0f, 9.0f).contains (e.position)) { drag = i; applyDrag (e.position); return; }
     for (int i = 0; i < kSwatches; ++i)
-        if (swatchAt (i).contains (e.position))
+        if (swatchAt (i).contains (e.position)) { applyPreset (swatchHue (i), 1.0f, 1.0f); return; }
+    for (int i = 0; i < 6; ++i)
+        if (chipRect (i).contains (e.position))
         {
-            hue = swatchHue (i); sat = 1.0f; bright = 1.0f;
-            if (onChange) onChange (hue, sat, bright);
+            switch (i)
+            {
+                case 0: lightOn = ! lightOn; if (onLight) onLight (lightOn); break;
+                case 1: gradOn = ! gradOn; if (onGradient) onGradient (gradOn, gradA, gradB); break;
+                case 2: applyPreset (0.0f, 1.0f, 1.0f); break;   // Default (violet)
+                case 3: applyPreset (0.31f, 1.3f, 1.12f); break; // FL orange
+                case 4: applyPreset (0.82f, 1.0f, 1.0f); break;  // Ocean blue
+                case 5: applyPreset (0.57f, 1.05f, 1.0f); break; // Green
+                default: break;
+            }
             repaint();
             return;
         }
@@ -1524,7 +1625,7 @@ void BrowserTabs::paint (juce::Graphics& g)
     const auto b = getLocalBounds().toFloat();
     juce::Path bg;
     bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight() + 8.0f, 8.0f, 8.0f, true, true, false, false);
-    g.setColour (juce::Colour (0xff232327));
+    g.setColour (theme::menuTab);
     g.fillPath (bg);
 
     const char* names[] = { "Presets", "Groups" };

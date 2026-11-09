@@ -137,8 +137,8 @@ void KeyboardPanel::paint (juce::Graphics& g)
         const auto r = keyRect (pc).reduced (1.0f, 0.0f);
         const bool on = metatune::isAllowed (mask, pc);
         juce::Colour top, bottom;
-        if (black) { top = on ? blackOnTop : blackOff; bottom = on ? blackOnBottom : blackOff.darker (0.2f); }
-        else       { top = on ? keyOnTop : keyOffTop; bottom = on ? keyOnBottom : keyOffBottom; }
+        if (black) { top = on ? tint (blackOnTop, keyHue) : blackOff; bottom = on ? tint (blackOnBottom, keyHue) : blackOff.darker (0.2f); }
+        else       { top = on ? tint (keyOnTop, keyHue) : keyOffTop; bottom = on ? tint (keyOnBottom, keyHue) : keyOffBottom; }
         if (const float h = keyHover[size_t (pc)]->get(); h > 0.0f) { top = top.brighter (0.12f * h); bottom = bottom.brighter (0.12f * h); }
         juce::Path p;
         p.addRoundedRectangle (r.getX(), r.getY(), r.getWidth(), r.getHeight(), 3.0f, 3.0f, false, false, true, true);
