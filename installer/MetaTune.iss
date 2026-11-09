@@ -11,6 +11,8 @@
 #define Bundle "MetaTune.vst3"
 #define BuiltBundle "..\build\msvc-Release\MetaTune_artefacts\Release\VST3\" + Bundle
 #define BuiltUpdater "..\build\msvc-Release\MetaTuneUpdater_artefacts\Release\MetaTune Updater.exe"
+#define KeyBundle "MetaKey.vst3"
+#define BuiltKey "..\build\msvc-Release\MetaKey_artefacts\Release\VST3\" + KeyBundle
 
 [Setup]
 AppId={{5B7C2E1A-8F3D-4C6B-9A2E-7D41F0C3B8E5}
@@ -37,9 +39,12 @@ LicenseFile=..\LICENSE
 Type: filesandordirs; Name: "{commoncf64}\VST3\MetaTune.vst3"
 ; Remove the previous bundle first so the folder takes this build's exact capitalisation.
 Type: filesandordirs; Name: "{commoncf64}\VST3\{#Bundle}"
+Type: filesandordirs; Name: "{commoncf64}\VST3\{#KeyBundle}"
 
 [Files]
 Source: "{#BuiltBundle}\*"; DestDir: "{commoncf64}\VST3\{#Bundle}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; MetaKey: the separate key-detection plugin (installed alongside MetaTune).
+Source: "{#BuiltKey}\*"; DestDir: "{commoncf64}\VST3\{#KeyBundle}"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; The plugin's Update button runs a temp copy of this; the copy lets this file be replaced during an update.
 Source: "{#BuiltUpdater}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
@@ -48,9 +53,10 @@ Source: "..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{commoncf64}\VST3\{#Bundle}"
+Type: filesandordirs; Name: "{commoncf64}\VST3\{#KeyBundle}"
 
 [Messages]
-FinishedLabel=MetaTune is installed.%n%nThe plugin (VST3) is in the standard VST3 folder: {commoncf64}\VST3\MetaTune.vst3%nThe updater and licenses are in: {app}%n%nOpen FL Studio. If MetaTune isn't in the plugin list yet, go to Options > Manage plugins > Find more plugins.
+FinishedLabel=MetaTune and MetaKey are installed.%n%nThe plugins (VST3) are in the standard VST3 folder: {commoncf64}\VST3%nThe updater and licenses are in: {app}%n%nOpen FL Studio. If they aren't in the plugin list yet, go to Options > Manage plugins > Find more plugins.
 
 [Code]
 // FL Studio keeps loaded plugins locked: replacing the bundle while it runs fails or leaves the old one.

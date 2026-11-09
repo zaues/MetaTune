@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(MetaTune VERSION 0.5.5 LANGUAGES C CXX)
+project(MetaTune VERSION 0.5.6 LANGUAGES C CXX)
 
 # Product naming lives here only; DSP code never refers to it.
 set(PRODUCT_NAME "MetaTune" CACHE STRING "User-visible plugin name")
@@ -58,6 +58,35 @@ target_link_libraries(MetaTune
     PRIVATE MetaTuneAssets juce::juce_audio_processors
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
 
+# MetaKey: a separate key-detection plugin (no updater). Shares MetaTune's UI theme and fonts.
+juce_add_plugin(MetaKey
+    COMPANY_NAME "Digital"
+    BUNDLE_ID com.zaues.metakey
+    PLUGIN_MANUFACTURER_CODE Lyra
+    PLUGIN_CODE LyKy
+    PRODUCT_NAME "MetaKey"
+    FORMATS VST3
+    IS_SYNTH FALSE
+    NEEDS_MIDI_INPUT FALSE
+    VST3_CATEGORIES Fx Analyzer
+    VST3_AUTO_MANIFEST FALSE
+    COPY_PLUGIN_AFTER_BUILD FALSE)
+
+target_sources(MetaKey PRIVATE
+    Source/MetaKey/MetaKeyProcessor.cpp
+    Source/MetaKey/MetaKeyEditor.cpp
+    Source/MetaKey/KeyDetector.cpp
+    Source/UI/Theme.cpp)
+
+target_compile_definitions(MetaKey PUBLIC
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0)
+
+target_link_libraries(MetaKey
+    PRIVATE MetaTuneAssets juce::juce_audio_processors juce::juce_audio_formats juce::juce_dsp
+    PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
+
 # Updater app: installed next to the licenses, started by the plugin's Update button.
 juce_add_gui_app(MetaTuneUpdater
     PRODUCT_NAME "${PRODUCT_NAME} Updater"
@@ -72,6 +101,13 @@ target_compile_definitions(MetaTuneUpdater PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_C
 target_link_libraries(MetaTuneUpdater
     PRIVATE MetaTuneAssets juce::juce_gui_basics juce::juce_cryptography shell32
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
+
+# Dev tool: render MetaKey's editor to PNG (not installed, not part of the plugin).
+add_executable(metakey_snapshot Tools/metakey_snapshot.cpp)
+target_include_directories(metakey_snapshot PRIVATE $<TARGET_PROPERTY:MetaKey,INCLUDE_DIRECTORIES>)
+target_compile_definitions(metakey_snapshot PRIVATE $<TARGET_PROPERTY:MetaKey,COMPILE_DEFINITIONS>)
+target_link_libraries(metakey_snapshot PRIVATE MetaKey juce::juce_recommended_config_flags)
+set_target_properties(metakey_snapshot PROPERTIES WIN32_EXECUTABLE FALSE)
 
 # Dev tool: render the editor to PNG under Wine (not installed, not part of the plugin).
 add_executable(ui_snapshot Tools/ui_snapshot.cpp)

@@ -16,7 +16,7 @@ call "%VSDIR%\VC\Auxiliary\Build\vcvars64.bat" >nul || exit /b 1
 set BUILD=build\msvc-%CONFIG%
 rem Always configure; -U drops cached values so CMakeLists.txt's product name and update repo win.
 cmake -S . -B "%BUILD%" -G Ninja -DCMAKE_BUILD_TYPE=%CONFIG% -UPRODUCT_NAME -UMETATUNE_UPDATE_REPO >nul || exit /b 1
-cmake --build "%BUILD%" --target MetaTune_VST3 MetaTuneUpdater || exit /b 1
+cmake --build "%BUILD%" --target MetaTune_VST3 MetaTuneUpdater MetaKey_VST3 || exit /b 1
 
 if not exist build\msvc-tests\build.ninja cmake -S Tests -B build\msvc-tests -G Ninja -DCMAKE_BUILD_TYPE=Release || exit /b 1
 cmake --build build\msvc-tests --target dsp_tests || exit /b 1

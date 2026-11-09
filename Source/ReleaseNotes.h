@@ -6,6 +6,10 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.5.6",
+      "- New companion plugin: MetaKey, a key detector, is now installed alongside MetaTune.\n"
+      "- MetaKey finds the key of a beat by Listening to a mixer track, from an audio File you load, or Manually.\n"
+      "- (The in-MetaTune Auto Key link to send MetaKey's result straight here is coming next.)" },
     { "0.5.5",
       "- Pitch Reference now shows a red fill that grows out from the centre (440 Hz) as you move it, like the Tone Volume bar.\n"
       "- Clicking Major or Minor now switches the scale to Major or Minor (and highlights it) instead of staying on a custom set." },
