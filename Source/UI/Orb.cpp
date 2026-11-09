@@ -63,7 +63,7 @@ juce::Rectangle<float> Orb::trackArea() const
     // The handle travels inside the guide lines but stops short of the axis labels, so the ball never
     // covers the Dry/Wet text (top) or the Doubler text (right); the labels stay fully visible.
     const auto pad = padArea();
-    const float top = pad.getY() + 56.0f, right = pad.getRight() - 70.0f;
+    const float top = pad.getY() + 50.0f, right = pad.getRight() - 70.0f;
     return { pad.getX(), top, right - pad.getX(), pad.getBottom() - top };
 }
 
