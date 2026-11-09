@@ -1305,6 +1305,8 @@ void ReleaseNotesCard::open (juce::Image blurredBackdrop)
     backdrop = blurredBackdrop;
     scroll = 0;
     lastWidth = 0; // force the layouts to rebuild for the current width
+    juce::Desktop::getInstance().getAnimator().cancelAnimation (this, false);
+    setAlpha (1.0f);
     setVisible (true);
     toFront (false);
     repaint();
@@ -1402,6 +1404,8 @@ void ReleaseNotesCard::mouseUp (const juce::MouseEvent& e)
 {
     if (closeBounds().contains (e.position) || ! cardBounds().contains (e.getPosition()))
     {
+        // Fade the whole overlay out (a proxy image animates while the real component hides).
+        juce::Desktop::getInstance().getAnimator().animateComponent (this, getBounds(), 0.0f, 220, true, 1.0, 1.0);
         setVisible (false);
         if (onClose) onClose();
     }

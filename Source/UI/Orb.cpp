@@ -58,14 +58,25 @@ juce::Rectangle<float> Orb::padArea() const
     return getLocalBounds().toFloat().reduced (18.0f * unit());
 }
 
+Orb::GuideGeom Orb::guideGeom() const
+{
+    // Visible L: a vertical line (top -> baseline, with room above for the Dry/Wet label) and a horizontal
+    // line (corner -> right end, with room past it for the Width label), plus a rounded corner radius.
+    const auto pad = padArea();
+    const float U = unit();
+    return { pad.getX(),                              // cornerX
+             pad.getBottom() - 26.0f,                 // baseY (room below for the Width label)
+             pad.getY() + 36.0f + 16.0f * U,          // topY  (top of the vertical line)
+             pad.getRight() - 30.0f - 22.0f * U,      // rightX (end of the horizontal line)
+             18.0f * U };                             // corner radius
+}
+
 juce::Rectangle<float> Orb::trackArea() const
 {
-    // The handle travels the full L: vertical line top (room for the Dry/Wet label) down to the
-    // baseline, and across to the horizontal line's end. Room is reserved below the baseline for the
-    // "Doubler Width" label. The axis labels are drawn on top of the ball.
-    const auto pad = padArea();
-    const float top = pad.getY() + 36.0f, right = pad.getRight() - 30.0f, bottom = pad.getBottom() - 26.0f;
-    return { pad.getX(), top, right - pad.getX(), bottom - top };
+    // The handle travels a reduced area so it stops a little before the top of each line.
+    const auto g = guideGeom();
+    const float m = 12.0f * unit();
+    return { g.cornerX, g.topY + m, (g.rightX - m) - g.cornerX, g.baseY - (g.topY + m) };
 }
 
 juce::Point<float> Orb::handlePos() const
@@ -81,10 +92,10 @@ bool Orb::hitTest (int x, int y)
     const float U = unit();
     if (p.getDistanceFrom (centre()) < (kSphereR + 4.0f) * U || p.getDistanceFrom (handlePos()) < 20.0f * U)
         return true;
-    const auto tr = trackArea();
-    const float x0 = tr.getX(), y1 = tr.getBottom(), yTop = tr.getY(), xEnd = tr.getRight(), tol = 7.0f * U;
-    const bool onV = std::abs (p.x - x0) < tol && p.y > yTop && p.y < y1 + tol;
-    const bool onH = std::abs (p.y - y1) < tol && p.x > x0 - tol && p.x < xEnd;
+    const auto gg = guideGeom();
+    const float tol = 7.0f * U;
+    const bool onV = std::abs (p.x - gg.cornerX) < tol && p.y > gg.topY && p.y < gg.baseY + tol;
+    const bool onH = std::abs (p.y - gg.baseY) < tol && p.x > gg.cornerX - tol && p.x < gg.rightX;
     return onV || onH;
 }
 
@@ -345,21 +356,20 @@ void Orb::paint (juce::Graphics& g)
     guide.setTarget (dragging || hoverHandle || hoverLine >= 0 ? 1.0f : 0.0f);
     if (const float ga = guide.get(); ga > 0.004f)
     {
-        const auto tr = trackArea();
+        const auto gg = guideGeom();
         const float U = unit();
-        const float x0 = tr.getX(), y1 = tr.getBottom(), yTop = tr.getY(), xEnd = tr.getRight();
-        const float gap = 16.0f * U, lw = 2.0f * U, r = 18.0f * U;
+        const float lw = 2.0f * U;
         const bool hot = hoverLine >= 0;
         juce::Path L; // vertical down, rounded corner, horizontal right
-        L.startNewSubPath (x0, yTop + gap);
-        L.lineTo (x0, y1 - r);
-        L.quadraticTo (x0, y1, x0 + r, y1);
-        L.lineTo (xEnd - gap, y1);
+        L.startNewSubPath (gg.cornerX, gg.topY);
+        L.lineTo (gg.cornerX, gg.baseY - gg.radius);
+        L.quadraticTo (gg.cornerX, gg.baseY, gg.cornerX + gg.radius, gg.baseY);
+        L.lineTo (gg.rightX, gg.baseY);
         g.setColour (juce::Colours::white.withAlpha (hot ? 0.95f : 0.55f * ga));
         g.strokePath (L, juce::PathStrokeType (lw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         g.setColour (juce::Colours::white.withAlpha ((hot ? 0.9f : 0.75f) * ga)); // markers that track the ball
-        g.fillEllipse (x0 - 3.5f * U, hp.y - 3.5f * U, 7.0f * U, 7.0f * U);
-        g.fillEllipse (hp.x - 3.5f * U, y1 - 3.5f * U, 7.0f * U, 7.0f * U);
+        g.fillEllipse (gg.cornerX - 3.5f * U, hp.y - 3.5f * U, 7.0f * U, 7.0f * U);
+        g.fillEllipse (hp.x - 3.5f * U, gg.baseY - 3.5f * U, 7.0f * U, 7.0f * U);
     }
 
     // XY handle. On hover/drag the ball reads concentric white centre / black / white.
@@ -394,14 +404,14 @@ void Orb::paint (juce::Graphics& g)
     // Doubler axis labels, drawn on top of the ball so it passes behind the text instead of over it.
     if (const float ga = guide; ga > 0.0f)
     {
-        const auto tr = trackArea();
-        const float x0 = tr.getX(), y1 = tr.getBottom(), yTop = tr.getY(), xEnd = tr.getRight();
+        const auto gg = guideGeom();
+        const float U = unit();
         g.setFont (font (12.0f, true));
         // Brighter text with a strong shadow so it stays legible when the grey ball slides behind it.
-        shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 46.0f, 110.0f, 30.0f),
+        shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, gg.cornerX - 10.0f), gg.topY - 46.0f, 110.0f, 30.0f),
                           juce::Justification::centredLeft, 2, text.withAlpha (ga), 1.0f);
-        // "Doubler Width" sits just past the end of the horizontal line, centred on the line (not below it).
-        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 6.0f, y1 - 17.0f, 84.0f, 34.0f), juce::Justification::centredLeft, 2, text.withAlpha (ga), 1.0f);
+        // "Doubler Width" sits past the end of the horizontal line, centred on it, with a clear gap.
+        shadowFittedText (g, xName, juce::Rectangle<float> (gg.rightX + 20.0f * U, gg.baseY - 17.0f, 84.0f, 34.0f), juce::Justification::centredLeft, 2, text.withAlpha (ga), 1.0f);
     }
 
     if (dragging)
@@ -420,13 +430,13 @@ void Orb::mouseMove (const juce::MouseEvent& e)
 {
     const float U = unit();
     const bool h = e.position.getDistanceFrom (handlePos()) < 20.0f * U;
-    const auto tr = trackArea();
-    const float x0 = tr.getX(), y1 = tr.getBottom(), yTop = tr.getY(), xEnd = tr.getRight(), tol = 7.0f * U;
+    const auto gg = guideGeom();
+    const float tol = 7.0f * U;
     int hl = -1;
     if (! h)
     {
-        if (std::abs (e.position.x - x0) < tol && e.position.y > yTop && e.position.y < y1) hl = 0;
-        else if (std::abs (e.position.y - y1) < tol && e.position.x > x0 && e.position.x < xEnd) hl = 1;
+        if (std::abs (e.position.x - gg.cornerX) < tol && e.position.y > gg.topY && e.position.y < gg.baseY) hl = 0;
+        else if (std::abs (e.position.y - gg.baseY) < tol && e.position.x > gg.cornerX && e.position.x < gg.rightX) hl = 1;
     }
     if (h != hoverHandle || hl != hoverLine) { hoverHandle = h; hoverLine = hl; repaint(); }
     setMouseCursor (h ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor);

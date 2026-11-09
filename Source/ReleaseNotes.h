@@ -6,6 +6,10 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.5.4",
+      "- The 'What's New' popup now fades out when you close it.\n"
+      "- More space between the Doubler line and the 'Doubler Width' label.\n"
+      "- The Doubler ball now stops just short of the top of each guide line instead of reaching the very end." },
     { "0.5.3",
       "- The 'Doubler Width' label now sits just past the end of its line, centred on it.\n"
       "- Tooltips follow the theme (light tooltips in light mode).\n"

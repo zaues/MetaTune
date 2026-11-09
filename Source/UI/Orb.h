@@ -36,7 +36,9 @@ private:
     juce::Point<float> centre() const { return getLocalBounds().toFloat().getCentre(); }
     juce::Point<float> handlePos() const;
     juce::Rectangle<float> padArea() const;
-    juce::Rectangle<float> trackArea() const; // the L-shaped guide extents the handle travels within
+    juce::Rectangle<float> trackArea() const; // the reduced area the handle travels (stops short of the line ends)
+    struct GuideGeom { float cornerX, baseY, topY, rightX, radius; }; // the visible L guide anchors
+    GuideGeom guideGeom() const;
     void renderImages();
 
     juce::RangedAudioParameter& xParam;
