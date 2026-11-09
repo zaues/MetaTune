@@ -67,10 +67,11 @@ inline void shadowText (juce::Graphics& g, const juce::String& t, RectType area,
                         juce::Justification j, juce::Colour colour, float dy = 1.6f, float alpha = 0.7f)
 {
     const auto a = area.toFloat();
+    const float sh = alpha * colour.getFloatAlpha(); // shadow fades with the text (so faded text leaves no black residue)
     // Two passes: a softer, lower one for spread, then the main shadow, then the text.
-    g.setColour (juce::Colours::black.withAlpha (alpha * 0.5f));
+    g.setColour (juce::Colours::black.withAlpha (sh * 0.5f));
     g.drawText (t, a.translated (0.0f, dy + 1.0f), j);
-    g.setColour (juce::Colours::black.withAlpha (alpha));
+    g.setColour (juce::Colours::black.withAlpha (sh));
     g.drawText (t, a.translated (0.0f, dy), j);
     g.setColour (colour);
     g.drawText (t, a, j);
@@ -80,9 +81,10 @@ inline void shadowFittedText (juce::Graphics& g, const juce::String& t, RectType
                               juce::Justification j, int maxLines, juce::Colour colour, float alpha = 0.7f)
 {
     const auto a = area.toFloat().toNearestInt();
-    g.setColour (juce::Colours::black.withAlpha (alpha * 0.5f));
+    const float sh = alpha * colour.getFloatAlpha();
+    g.setColour (juce::Colours::black.withAlpha (sh * 0.5f));
     g.drawFittedText (t, a.translated (0, 3), j, maxLines);
-    g.setColour (juce::Colours::black.withAlpha (alpha));
+    g.setColour (juce::Colours::black.withAlpha (sh));
     g.drawFittedText (t, a.translated (0, 2), j, maxLines);
     g.setColour (colour);
     g.drawFittedText (t, a, j, maxLines);

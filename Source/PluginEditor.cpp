@@ -14,7 +14,7 @@ constexpr float speedR = 100, sustainR = 58, amountR = 92;
 constexpr float speedBand = 0.69f;            // Speed knob: proportion where the aggressive (< 0 ms) band starts
 } // namespace layout
 
-static juce::String formatSpeed (double v) { return std::abs (v) < 10.0 ? juce::String (v, 1) : juce::String (juce::roundToInt (v)); }
+static juce::String formatSpeed (double v) { return std::abs (v) < 100.0 ? juce::String (v, 1) : juce::String (juce::roundToInt (v)); }
 
 static juce::Rectangle<int> around (juce::Point<float> c, float r) { return juce::Rectangle<float> (2 * r, 2 * r).withCentre (c).toNearestInt(); }
 
