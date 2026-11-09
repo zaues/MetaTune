@@ -87,9 +87,9 @@ juce::Rectangle<int> MetaTuneLookAndFeel::getTooltipBounds (const juce::String& 
 void MetaTuneLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& tip, int w, int h)
 {
     const auto r = juce::Rectangle<float> (0, 0, float (w), float (h));
-    g.setColour (juce::Colour (0xf20a0a0b));
+    g.setColour (theme::menuBg.withAlpha (0.97f)); // follows the theme (dark or light)
     g.fillRoundedRectangle (r, 7.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.10f));
+    g.setColour (theme::lightMode ? juce::Colours::black.withAlpha (0.14f) : juce::Colours::white.withAlpha (0.10f));
     g.drawRoundedRectangle (r.reduced (0.5f), 7.0f, 1.0f);
     juce::AttributedString s;
     s.append (tip, theme::font (13.0f, true), theme::text);

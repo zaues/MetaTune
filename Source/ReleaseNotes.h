@@ -6,6 +6,10 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.5.3",
+      "- The 'Doubler Width' label now sits just past the end of its line, centred on it.\n"
+      "- Tooltips follow the theme (light tooltips in light mode).\n"
+      "- In the colour panel, 'Default' highlights when nothing is customised, and clicking it also returns you to the dark theme." },
     { "0.5.2",
       "- The Doubler guide is a single line with a rounded corner, hidden until you hover it (or the ball), then it lights up white.\n"
       "- The 'Doubler Width' label now shows in full, spaced below its line.\n"

@@ -1517,17 +1517,24 @@ void ColorPanel::paint (juce::Graphics& g)
     }
 
     // --- Chips: Light / Gradient toggles, then Default / FL / Ocean / Green presets.
+    // "Default" lights up (grey) when nothing is customised: default accent, no gradient, dark theme.
+    const bool isDefault = ! gradOn && ! lightOn && std::abs (hue) < 0.01f
+                           && std::abs (sat - 1.0f) < 0.03f && std::abs (bright - 1.0f) < 0.03f;
     const char* clabels[] = { "Light", "Gradient", "Default", "FL", "Ocean", "Green" };
-    const bool active[] = { lightOn, gradOn, false, false, false, false };
+    const bool active[] = { lightOn, gradOn, isDefault, false, false, false };
     for (int i = 0; i < 6; ++i)
     {
         const auto c = chipRect (i);
         const bool hot = c.contains (mouse);
-        g.setColour (active[i] ? violet.withAlpha (0.92f) : menuSel.withAlpha (hot ? 1.0f : 0.65f));
+        const bool greySel = i == 2; // Default uses a neutral grey "selected" fill, not the accent
+        g.setColour (active[i] ? (greySel ? bg3.brighter (0.18f) : violet.withAlpha (0.92f))
+                               : menuSel.withAlpha (hot ? 1.0f : 0.65f));
         g.fillRoundedRectangle (c, 5.0f);
         if (! active[i]) { g.setColour (juce::Colours::white.withAlpha (hot ? 0.3f : 0.1f)); g.drawRoundedRectangle (c.reduced (0.5f), 5.0f, 1.0f); }
         g.setFont (font (11.5f, true));
-        shadowText (g, clabels[i], c, juce::Justification::centred, active[i] ? juce::Colours::white : textDim.interpolatedWith (text, hot ? 1.0f : 0.5f));
+        const juce::Colour lblCol = active[i] ? (greySel ? text : juce::Colours::white)
+                                              : textDim.interpolatedWith (text, hot ? 1.0f : 0.5f);
+        shadowText (g, clabels[i], c, juce::Justification::centred, lblCol);
     }
 
     // --- Gradient endpoints
@@ -1597,7 +1604,10 @@ void ColorPanel::mouseDown (const juce::MouseEvent& e)
             {
                 case 0: lightOn = ! lightOn; if (onLight) onLight (lightOn); break;
                 case 1: gradOn = ! gradOn; if (onGradient) onGradient (gradOn, gradA, gradB); break;
-                case 2: applyPreset (0.0f, 1.0f, 1.0f); break;   // Default (violet)
+                case 2: // Default: reset accent, gradient AND the light theme
+                    if (lightOn) { lightOn = false; if (onLight) onLight (false); }
+                    applyPreset (0.0f, 1.0f, 1.0f);
+                    break;
                 case 3: applyPreset (0.31f, 1.3f, 1.12f); break; // FL orange
                 case 4: applyPreset (0.82f, 1.0f, 1.0f); break;  // Ocean blue
                 case 5: applyPreset (0.57f, 1.05f, 1.0f); break; // Green

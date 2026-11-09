@@ -400,7 +400,8 @@ void Orb::paint (juce::Graphics& g)
         // Brighter text with a strong shadow so it stays legible when the grey ball slides behind it.
         shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 46.0f, 110.0f, 30.0f),
                           juce::Justification::centredLeft, 2, text.withAlpha (ga), 1.0f);
-        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 48.0f, y1 + 10.0f, 96.0f, 32.0f), juce::Justification::centred, 2, text.withAlpha (ga), 1.0f);
+        // "Doubler Width" sits just past the end of the horizontal line, centred on the line (not below it).
+        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 6.0f, y1 - 17.0f, 84.0f, 34.0f), juce::Justification::centredLeft, 2, text.withAlpha (ga), 1.0f);
     }
 
     if (dragging)
