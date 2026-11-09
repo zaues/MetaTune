@@ -60,10 +60,10 @@ juce::Rectangle<float> Orb::padArea() const
 
 juce::Rectangle<float> Orb::trackArea() const
 {
-    // The handle travels inside the guide lines but stops short of the axis labels, so the ball never
-    // covers the Dry/Wet text (top) or the Doubler text (right); the labels stay fully visible.
+    // The handle travels the full L: vertical line top (room for the Dry/Wet label) down to the
+    // baseline, and across to the horizontal line's end. The axis labels are drawn on top of the ball.
     const auto pad = padArea();
-    const float top = pad.getY() + 50.0f, right = pad.getRight() - 70.0f;
+    const float top = pad.getY() + 36.0f, right = pad.getRight() - 30.0f;
     return { pad.getX(), top, right - pad.getX(), pad.getBottom() - top };
 }
 
@@ -344,12 +344,6 @@ void Orb::paint (juce::Graphics& g)
         g.setColour (juce::Colours::white.withAlpha (0.8f * ga));
         g.fillEllipse (x0 - 3.5f, hp.y - 3.5f, 7.0f, 7.0f);
         g.fillEllipse (hp.x - 3.5f, y1 - 3.5f, 7.0f, 7.0f);
-        g.setFont (font (12.0f, true));
-        // Labels stay fully visible; the ball is constrained (trackArea) so it never reaches them.
-        // Left-aligned from just before the axis line so the label never runs off the component's left edge.
-        shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 34.0f, 110.0f, 30.0f),
-                          juce::Justification::centredLeft, 2, textDim.withAlpha (ga));
-        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 45.0f, y1 + 2.0f, 90.0f, 30.0f), juce::Justification::centred, 2, textDim.withAlpha (ga));
     }
 
     // XY handle: grey ball.
@@ -361,6 +355,18 @@ void Orb::paint (juce::Graphics& g)
     g.fillPath (hpath);
     g.setColour (juce::Colours::white.withAlpha (0.12f));
     g.strokePath (hpath, juce::PathStrokeType (1.0f));
+
+    // Doubler axis labels, drawn on top of the ball so it passes behind the text instead of over it.
+    if (const float ga = guide; ga > 0.0f)
+    {
+        const auto pad = padArea();
+        const float x0 = pad.getX(), y1 = pad.getBottom(), yTop = pad.getY() + 36.0f, xEnd = pad.getRight() - 30.0f;
+        g.setFont (font (12.0f, true));
+        shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 34.0f, 110.0f, 30.0f),
+                          juce::Justification::centredLeft, 2, textDim.withAlpha (ga));
+        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 45.0f, y1 + 2.0f, 90.0f, 30.0f), juce::Justification::centred, 2, textDim.withAlpha (ga));
+    }
+
     if (dragging)
     {
         g.setFont (font (12.0f, true));
