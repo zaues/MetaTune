@@ -6,6 +6,10 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.5.2",
+      "- The Doubler guide is a single line with a rounded corner, hidden until you hover it (or the ball), then it lights up white.\n"
+      "- The 'Doubler Width' label now shows in full, spaced below its line.\n"
+      "- Light mode: the selected scale and Note Stabilizer buttons (Chromatic, Tone, etc.) and tooltips now follow the theme." },
     { "0.5.1",
       "- Light mode now covers the whole interface: the side columns, keyboard, note labels and bottom bars all go light.\n"
       "- The header preset box opens a presets-only list; the grid/box icon still opens the tabbed Presets + Groups browser.\n"

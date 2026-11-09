@@ -61,10 +61,11 @@ juce::Rectangle<float> Orb::padArea() const
 juce::Rectangle<float> Orb::trackArea() const
 {
     // The handle travels the full L: vertical line top (room for the Dry/Wet label) down to the
-    // baseline, and across to the horizontal line's end. The axis labels are drawn on top of the ball.
+    // baseline, and across to the horizontal line's end. Room is reserved below the baseline for the
+    // "Doubler Width" label. The axis labels are drawn on top of the ball.
     const auto pad = padArea();
-    const float top = pad.getY() + 36.0f, right = pad.getRight() - 30.0f;
-    return { pad.getX(), top, right - pad.getX(), pad.getBottom() - top };
+    const float top = pad.getY() + 36.0f, right = pad.getRight() - 30.0f, bottom = pad.getBottom() - 26.0f;
+    return { pad.getX(), top, right - pad.getX(), bottom - top };
 }
 
 juce::Point<float> Orb::handlePos() const
@@ -80,8 +81,8 @@ bool Orb::hitTest (int x, int y)
     const float U = unit();
     if (p.getDistanceFrom (centre()) < (kSphereR + 4.0f) * U || p.getDistanceFrom (handlePos()) < 20.0f * U)
         return true;
-    const auto pad = padArea();
-    const float x0 = pad.getX(), y1 = pad.getBottom(), yTop = pad.getY() + 36.0f, xEnd = pad.getRight() - 30.0f, tol = 7.0f * U;
+    const auto tr = trackArea();
+    const float x0 = tr.getX(), y1 = tr.getBottom(), yTop = tr.getY(), xEnd = tr.getRight(), tol = 7.0f * U;
     const bool onV = std::abs (p.x - x0) < tol && p.y > yTop && p.y < y1 + tol;
     const bool onH = std::abs (p.y - y1) < tol && p.x > x0 - tol && p.x < xEnd;
     return onV || onH;
@@ -338,28 +339,27 @@ void Orb::paint (juce::Graphics& g)
     }
 
 
-    // Doubler guides: an L of rounded axis lines, always faintly visible, that light up white when the ball
-    // or the line itself is hovered. Each line stops short of its end (a gap by the axis label).
+    // Doubler guide: a single L with a rounded corner, hidden until the ball or the line is hovered,
+    // then it lights up (white when the line itself is hovered). Each end stops short, by the axis label.
     const auto hp = handlePos();
     guide.setTarget (dragging || hoverHandle || hoverLine >= 0 ? 1.0f : 0.0f);
+    if (const float ga = guide.get(); ga > 0.004f)
     {
-        const auto pad = padArea();
+        const auto tr = trackArea();
         const float U = unit();
-        const float x0 = pad.getX(), y1 = pad.getBottom(), yTop = pad.getY() + 36.0f, xEnd = pad.getRight() - 30.0f;
-        const float gap = 16.0f * U, lw = 2.0f * U, ga = guide.get();
-        auto lineCol = [&] (bool hot) { return juce::Colours::white.withAlpha (hot ? 0.95f : 0.14f + 0.42f * ga); };
-        juce::Path v;  v.startNewSubPath (x0, yTop + gap);      v.lineTo (x0, y1);            // Dry / Wet (vertical)
-        g.setColour (lineCol (hoverLine == 0));
-        g.strokePath (v, juce::PathStrokeType (lw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        juce::Path hgl; hgl.startNewSubPath (x0, y1);          hgl.lineTo (xEnd - gap, y1);  // Width (horizontal)
-        g.setColour (lineCol (hoverLine == 1));
-        g.strokePath (hgl, juce::PathStrokeType (lw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        if (ga > 0.01f) // markers that track the ball along each axis
-        {
-            g.setColour (juce::Colours::white.withAlpha (0.8f * ga));
-            g.fillEllipse (x0 - 3.5f * U, hp.y - 3.5f * U, 7.0f * U, 7.0f * U);
-            g.fillEllipse (hp.x - 3.5f * U, y1 - 3.5f * U, 7.0f * U, 7.0f * U);
-        }
+        const float x0 = tr.getX(), y1 = tr.getBottom(), yTop = tr.getY(), xEnd = tr.getRight();
+        const float gap = 16.0f * U, lw = 2.0f * U, r = 18.0f * U;
+        const bool hot = hoverLine >= 0;
+        juce::Path L; // vertical down, rounded corner, horizontal right
+        L.startNewSubPath (x0, yTop + gap);
+        L.lineTo (x0, y1 - r);
+        L.quadraticTo (x0, y1, x0 + r, y1);
+        L.lineTo (xEnd - gap, y1);
+        g.setColour (juce::Colours::white.withAlpha (hot ? 0.95f : 0.55f * ga));
+        g.strokePath (L, juce::PathStrokeType (lw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (juce::Colours::white.withAlpha ((hot ? 0.9f : 0.75f) * ga)); // markers that track the ball
+        g.fillEllipse (x0 - 3.5f * U, hp.y - 3.5f * U, 7.0f * U, 7.0f * U);
+        g.fillEllipse (hp.x - 3.5f * U, y1 - 3.5f * U, 7.0f * U, 7.0f * U);
     }
 
     // XY handle. On hover/drag the ball reads concentric white centre / black / white.
@@ -394,13 +394,13 @@ void Orb::paint (juce::Graphics& g)
     // Doubler axis labels, drawn on top of the ball so it passes behind the text instead of over it.
     if (const float ga = guide; ga > 0.0f)
     {
-        const auto pad = padArea();
-        const float x0 = pad.getX(), y1 = pad.getBottom(), yTop = pad.getY() + 36.0f, xEnd = pad.getRight() - 30.0f;
+        const auto tr = trackArea();
+        const float x0 = tr.getX(), y1 = tr.getBottom(), yTop = tr.getY(), xEnd = tr.getRight();
         g.setFont (font (12.0f, true));
         // Brighter text with a strong shadow so it stays legible when the grey ball slides behind it.
         shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 46.0f, 110.0f, 30.0f),
                           juce::Justification::centredLeft, 2, text.withAlpha (ga), 1.0f);
-        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 45.0f, y1 + 2.0f, 90.0f, 30.0f), juce::Justification::centred, 2, text.withAlpha (ga), 1.0f);
+        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 48.0f, y1 + 10.0f, 96.0f, 32.0f), juce::Justification::centred, 2, text.withAlpha (ga), 1.0f);
     }
 
     if (dragging)
@@ -419,8 +419,8 @@ void Orb::mouseMove (const juce::MouseEvent& e)
 {
     const float U = unit();
     const bool h = e.position.getDistanceFrom (handlePos()) < 20.0f * U;
-    const auto pad = padArea();
-    const float x0 = pad.getX(), y1 = pad.getBottom(), yTop = pad.getY() + 36.0f, xEnd = pad.getRight() - 30.0f, tol = 7.0f * U;
+    const auto tr = trackArea();
+    const float x0 = tr.getX(), y1 = tr.getBottom(), yTop = tr.getY(), xEnd = tr.getRight(), tol = 7.0f * U;
     int hl = -1;
     if (! h)
     {

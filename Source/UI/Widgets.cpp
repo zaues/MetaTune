@@ -192,14 +192,14 @@ void TextPill::paintButton (juce::Graphics& g, bool, bool down)
     {
         if (l > 0.0f)
         {
-            g.setGradientFill (juce::ColourGradient (juce::Colour (0xff42454f).withAlpha (l), r.getX(), r.getY(), juce::Colour (0xff2f323a).withAlpha (l), r.getX(), r.getBottom(), false));
+            g.setGradientFill (juce::ColourGradient (bg3.brighter (0.12f).withAlpha (l), r.getX(), r.getY(), bg3.darker (0.12f).withAlpha (l), r.getX(), r.getBottom(), false));
             g.fillPath (p);
         }
     }
     else
     {
-        // Recessed pill: dark fill with an inset shadow along the top.
-        g.setColour (bg1.interpolatedWith (juce::Colour (0xff2a2b34), l));
+        // Recessed pill: fill with an inset shadow along the top.
+        g.setColour (bg1.interpolatedWith (bg3.brighter (0.1f), l));
         g.fillPath (p);
         juce::Graphics::ScopedSaveState ss (g);
         g.reduceClipRegion (p);
@@ -282,7 +282,7 @@ void SegmentedControl::paint (juce::Graphics& g)
     const float w = r.getWidth() / float (labels.size());
     // Grey highlight glides to the selected segment.
     const auto sel = juce::Rectangle<float> (r.getX() + w * slide.get(), r.getY(), w, r.getHeight()).reduced (3.0f);
-    g.setColour (juce::Colour (0xff2a2b34));
+    g.setColour (bg3.brighter (0.1f));
     g.fillRoundedRectangle (sel, sel.getHeight() * 0.5f);
     g.setColour (line.brighter (0.25f));
     g.drawRoundedRectangle (sel, sel.getHeight() * 0.5f, 1.0f);

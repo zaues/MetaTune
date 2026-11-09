@@ -35,6 +35,10 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
         theme::setGradient (true, juce::Colour::fromHSV (update::Settings::gradHueA(), 0.85f, 1.0f, 1.0f),
                                   juce::Colour::fromHSV (update::Settings::gradHueB(), 0.85f, 1.0f, 1.0f));
     setLookAndFeel (&lnf);
+    lnf.setColour (juce::TooltipWindow::backgroundColourId, theme::bg3);   // theme was applied above; refresh
+    lnf.setColour (juce::TooltipWindow::textColourId, theme::text);
+    lnf.setColour (juce::PopupMenu::backgroundColourId, theme::menuBg);
+    lnf.setColour (juce::PopupMenu::textColourId, theme::text);
     addAndMakeVisible (canvas);
 
     for (auto* c : std::initializer_list<juce::Component*> { &orb, &speedKnob, &sustainKnob, &amountKnob, &keyboard, &refStrip, &toneSlider,
@@ -925,6 +929,13 @@ void MetaTuneEditor::showBrowser (bool show, int tab)
 
 void MetaTuneEditor::repaintAll()
 {
+    // Tooltip / popup colours are baked into the look-and-feel, so refresh them for the current theme.
+    lnf.setColour (juce::TooltipWindow::backgroundColourId, theme::bg3);
+    lnf.setColour (juce::TooltipWindow::textColourId, theme::text);
+    lnf.setColour (juce::PopupMenu::backgroundColourId, theme::menuBg);
+    lnf.setColour (juce::PopupMenu::textColourId, theme::text);
+    lnf.setColour (juce::PopupMenu::highlightedBackgroundColourId, theme::violet.withAlpha (0.35f));
+    lnf.setColour (juce::PopupMenu::highlightedTextColourId, theme::text);
     brushed = juce::Image(); // rebuilt on the next paint in the current theme
     canvas.repaint();
 }
