@@ -122,9 +122,8 @@ void KeyboardPanel::paint (juce::Graphics& g)
             g.setColour (juce::Colours::white.withAlpha (0.08f * h));
             g.fillRect (r);
         }
-        g.setColour (on ? text : text.withAlpha (0.45f));
         g.setFont (font (14.0f, true));
-        g.drawText ((useFlats ? kFlatNames : kSharpNames)[pc], r, juce::Justification::centred);
+        shadowText (g, (useFlats ? kFlatNames : kSharpNames)[pc], r, juce::Justification::centred, on ? text : text.withAlpha (0.45f));
         if (on)
         {
             g.setColour (lavender.withAlpha (0.9f));
@@ -169,9 +168,8 @@ void KeyboardPanel::paint (juce::Graphics& g)
         const auto p = piano();
         g.setColour (bg0.withAlpha (0.75f));
         g.fillRect (p);
-        g.setColour (warn);
         g.setFont (font (15.0f, true));
-        g.drawText ("No notes enabled - correction paused. Click a key to enable it.", p, juce::Justification::centred);
+        shadowText (g, "No notes enabled - correction paused. Click a key to enable it.", p, juce::Justification::centred, warn);
     }
 }
 

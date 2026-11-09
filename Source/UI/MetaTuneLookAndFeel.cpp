@@ -57,9 +57,9 @@ void MetaTuneLookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rect
         g.setColour (violet.brighter (0.3f));
         g.fillEllipse (r.getX() + 9.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f);
     }
-    g.setColour (! isActive ? textFaint : (isTicked || isHighlighted ? theme::text : textDim.brighter (0.2f)));
     g.setFont (getPopupMenuFont());
-    g.drawText (text, r.withTrimmedLeft (22.0f).withTrimmedRight (22.0f), juce::Justification::centredLeft);
+    theme::shadowText (g, text, r.withTrimmedLeft (22.0f).withTrimmedRight (22.0f), juce::Justification::centredLeft,
+                       ! isActive ? textFaint : (isTicked || isHighlighted ? theme::text : textDim.brighter (0.2f)));
     if (hasSubMenu)
     {
         juce::Path arrow;

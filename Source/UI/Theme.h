@@ -61,21 +61,26 @@ inline juce::Colour accentAt (float t)
 juce::Font font (float height, bool semibold = false);
 
 // Text with a soft drop shadow. The font must already be set on g; pass the text colour.
-inline void shadowText (juce::Graphics& g, const juce::String& t, juce::Rectangle<float> area,
+// Templated on the rectangle type so any Rectangle<int>/<float> works at the call site.
+template <typename RectType>
+inline void shadowText (juce::Graphics& g, const juce::String& t, RectType area,
                         juce::Justification j, juce::Colour colour, float dy = 1.0f, float alpha = 0.55f)
 {
+    const auto a = area.toFloat();
     g.setColour (juce::Colours::black.withAlpha (alpha));
-    g.drawText (t, area.translated (0.0f, dy), j);
+    g.drawText (t, a.translated (0.0f, dy), j);
     g.setColour (colour);
-    g.drawText (t, area, j);
+    g.drawText (t, a, j);
 }
-inline void shadowFittedText (juce::Graphics& g, const juce::String& t, juce::Rectangle<int> area,
+template <typename RectType>
+inline void shadowFittedText (juce::Graphics& g, const juce::String& t, RectType area,
                               juce::Justification j, int maxLines, juce::Colour colour, float alpha = 0.55f)
 {
+    const auto a = area.toFloat().toNearestInt();
     g.setColour (juce::Colours::black.withAlpha (alpha));
-    g.drawFittedText (t, area.translated (0, 1), j, maxLines);
+    g.drawFittedText (t, a.translated (0, 1), j, maxLines);
     g.setColour (colour);
-    g.drawFittedText (t, area, j, maxLines);
+    g.drawFittedText (t, a, j, maxLines);
 }
 
 // Eases a value toward a target at 60 Hz and repaints the owner while moving (hover fades, slides).

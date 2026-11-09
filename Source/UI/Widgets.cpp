@@ -157,9 +157,8 @@ void IconButton::paintButton (juce::Graphics& g, bool, bool down)
     }
     auto capCol = on ? theme::text : textDim.interpolatedWith (theme::text, h);
     if (on && onColour != theme::text) capCol = onColour;
-    g.setColour (isEnabled() ? capCol : textFaint);
     g.setFont (font (12.5f, true));
-    g.drawFittedText (caption, r.toNearestInt().withTrimmedRight (4), juce::Justification::centred, 2, 0.9f);
+    shadowFittedText (g, caption, r.withTrimmedRight (4.0f), juce::Justification::centred, 2, isEnabled() ? capCol : textFaint);
 }
 
 void PillButton::paintButton (juce::Graphics& g, bool, bool)
@@ -167,9 +166,8 @@ void PillButton::paintButton (juce::Graphics& g, bool, bool)
     using namespace theme;
     const auto r = getLocalBounds().toFloat();
     const bool on = getToggleState();
-    g.setColour (on ? theme::text : textDim.interpolatedWith (theme::text, 0.7f * hover));
     g.setFont (font (20.0f, on));
-    g.drawText (getButtonText(), r, juce::Justification::centred);
+    shadowText (g, getButtonText(), r, juce::Justification::centred, on ? theme::text : textDim.interpolatedWith (theme::text, 0.7f * hover));
 }
 
 void TextPill::paintButton (juce::Graphics& g, bool, bool down)
@@ -235,7 +233,7 @@ void UpdatePill::paintButton (juce::Graphics& g, bool, bool down)
     g.setColour (juce::Colours::white);
     g.strokePath (a, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     g.setFont (font (12.5f, true));
-    g.drawText (getButtonText(), r.withTrimmedLeft (r.getHeight() * 0.95f).withTrimmedRight (8.0f), juce::Justification::centred);
+    shadowText (g, getButtonText(), r.withTrimmedLeft (r.getHeight() * 0.95f).withTrimmedRight (8.0f), juce::Justification::centred, juce::Colours::white);
 }
 
 void ToggleSwitch::paintButton (juce::Graphics& g, bool, bool)
@@ -289,9 +287,8 @@ void SegmentedControl::paint (juce::Graphics& g)
             g.fillRoundedRectangle (cellR, cellR.getHeight() * 0.5f);
         }
         const float near = juce::jmax (0.0f, 1.0f - std::abs (slide.get() - float (i)));
-        g.setColour (textDim.brighter (0.15f).interpolatedWith (text, juce::jmax (near, 0.7f * h)));
         g.setFont (font (14.0f));
-        g.drawText (labels[i], cellR, juce::Justification::centred);
+        shadowText (g, labels[i], cellR, juce::Justification::centred, textDim.brighter (0.15f).interpolatedWith (text, juce::jmax (near, 0.7f * h)));
     }
 }
 
@@ -343,12 +340,10 @@ void GroupTabs::paint (juce::Graphics& g)
             g.fillRect (r.getX(), r.getY() + 6.0f, 2.0f, r.getHeight() - 12.0f);
         }
         // How many plugin copies are in this group.
-        g.setColour (counts[i] > 0 ? violet.brighter (0.4f) : violet.withAlpha (0.8f));
         g.setFont (font (12.0f, true));
-        g.drawText (juce::String (counts[i]), juce::Rectangle<float> (r.getRight() - 24.0f, r.getY() + 4.0f, 18.0f, 14.0f), juce::Justification::centred);
-        g.setColour (textDim.interpolatedWith (text, juce::jmax (sa, 0.7f * ha)));
+        shadowText (g, juce::String (counts[i]), juce::Rectangle<float> (r.getRight() - 24.0f, r.getY() + 4.0f, 18.0f, 14.0f), juce::Justification::centred, counts[i] > 0 ? violet.brighter (0.4f) : violet.withAlpha (0.8f));
         g.setFont (font (17.0f, true));
-        g.drawText (juce::String (i + 1), juce::Rectangle<float> (r.getX() + 8.0f, r.getY() + 14.0f, 18.0f, r.getHeight() - 14.0f), juce::Justification::centred);
+        shadowText (g, juce::String (i + 1), juce::Rectangle<float> (r.getX() + 8.0f, r.getY() + 14.0f, 18.0f, r.getHeight() - 14.0f), juce::Justification::centred, textDim.interpolatedWith (text, juce::jmax (sa, 0.7f * ha)));
     }
 }
 
@@ -392,9 +387,8 @@ void PresetBar::paint (juce::Graphics& g)
         juce::Graphics::ScopedSaveState ss (g);
         const auto tr = main.withTrimmedLeft (18.0f).withTrimmedRight (60.0f);
         g.addTransform (juce::AffineTransform::shear (-0.18f, 0.0f).translated (0.18f * tr.getCentreY(), 0.0f));
-        g.setColour (name.isEmpty() ? textDim : text);
         g.setFont (font (14.0f));
-        g.drawText (name.isEmpty() ? juce::String ("No preset selected") : name, tr, juce::Justification::centredLeft);
+        shadowText (g, name.isEmpty() ? juce::String ("No preset selected") : name, tr, juce::Justification::centredLeft, name.isEmpty() ? textDim : text);
     }
 
     // Preset icon: bracketed bars.
@@ -477,9 +471,8 @@ void ValueStrip::paint (juce::Graphics& g)
     g.fillRect (x - 1.0f, track.getY() + 2.0f, 2.0f, track.getHeight() - 4.0f);
     const double hz = getValue();
     const int cents = juce::roundToInt (1200.0 * std::log2 (hz / 440.0));
-    g.setColour (text);
     g.setFont (font (13.5f, true));
-    g.drawText (juce::String (cents) + "cts " + juce::String (hz, 1) + "Hz", r.withTrimmedTop (6.0f), juce::Justification::centred);
+    shadowText (g, juce::String (cents) + "cts " + juce::String (hz, 1) + "Hz", r.withTrimmedTop (6.0f), juce::Justification::centred, text);
 }
 
 const juce::StringArray& RootPicker::scaleNames()
@@ -559,9 +552,8 @@ void RootPicker::paint (juce::Graphics& g)
             g.setColour (juce::Colour (0xffc9ccd4).withAlpha (sel ? 0.85f : 0.5f * a.get()));
             g.drawRoundedRectangle (r.reduced (1.5f), 4.0f, 1.0f);
         }
-        g.setColour (sel ? text : greyText.interpolatedWith (text, a.get()));
         g.setFont (font (12.5f, sel));
-        g.drawText (i == 0 ? "Flats" : "Sharps", r, juce::Justification::centred);
+        shadowText (g, i == 0 ? juce::String ("Flats") : juce::String ("Sharps"), r, juce::Justification::centred, sel ? text : greyText.interpolatedWith (text, a.get()));
     }
 
     // Root grid: letter plus a raised accidental.
@@ -585,9 +577,8 @@ void RootPicker::paint (juce::Graphics& g)
         const auto r = scaleRect (i);
         hoverBox (r, false);
         const bool sel = i == scale;
-        g.setColour (sel ? text : greyText);
         g.setFont (font (sel ? 12.5f : 11.5f, sel));
-        g.drawText (scaleNames()[i], r, juce::Justification::centred);
+        shadowText (g, scaleNames()[i], r, juce::Justification::centred, sel ? text : greyText);
     }
 }
 

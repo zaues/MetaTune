@@ -326,9 +326,8 @@ void Orb::paint (juce::Graphics& g)
     }
     if (bypassed)
     {
-        g.setColour (text.withAlpha (0.6f));
         g.setFont (font (16.0f * U, true));
-        g.drawText ("BYPASSED", juce::Rectangle<float> (140.0f * U, 24.0f * U).withCentre (c.translated (0, (kCoreR + 30.0f) * U)), juce::Justification::centred);
+        shadowText (g, "BYPASSED", juce::Rectangle<float> (140.0f * U, 24.0f * U).withCentre (c.translated (0, (kCoreR + 30.0f) * U)), juce::Justification::centred, text.withAlpha (0.6f));
     }
 
 
@@ -345,12 +344,14 @@ void Orb::paint (juce::Graphics& g)
         g.setColour (juce::Colours::white.withAlpha (0.8f * ga));
         g.fillEllipse (x0 - 3.5f, hp.y - 3.5f, 7.0f, 7.0f);
         g.fillEllipse (hp.x - 3.5f, y1 - 3.5f, 7.0f, 7.0f);
-        g.setColour (textDim.withAlpha (ga));
         g.setFont (font (12.0f, true));
+        // Fade each axis label out as the ball nears it, so the handle never sits on top of the text.
+        const float yFade = juce::jlimit (0.0f, 1.0f, (0.78f - yNorm) / 0.18f); // Dry/Wet is at the top
+        const float xFade = juce::jlimit (0.0f, 1.0f, (0.74f - xNorm) / 0.18f); // Doubler is at the right
         // Left-aligned from just before the axis line so the label never runs off the component's left edge.
-        g.drawFittedText (yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 34.0f, 110.0f, 30.0f).toNearestInt(),
-                          juce::Justification::centredLeft, 2);
-        g.drawFittedText (xName, juce::Rectangle<float> (xEnd - 45.0f, y1 + 2.0f, 90.0f, 30.0f).toNearestInt(), juce::Justification::centred, 2);
+        shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, x0 - 10.0f), yTop - 34.0f, 110.0f, 30.0f),
+                          juce::Justification::centredLeft, 2, textDim.withAlpha (ga * yFade));
+        shadowFittedText (g, xName, juce::Rectangle<float> (xEnd - 45.0f, y1 + 2.0f, 90.0f, 30.0f), juce::Justification::centred, 2, textDim.withAlpha (ga * xFade));
     }
 
     // XY handle: grey ball.
@@ -370,8 +371,7 @@ void Orb::paint (juce::Graphics& g)
         box = box.constrainedWithin (getLocalBounds().toFloat());
         g.setColour (bg3.withAlpha (0.92f));
         g.fillRoundedRectangle (box, 5.0f);
-        g.setColour (text);
-        g.drawText (label, box, juce::Justification::centred);
+        shadowText (g, label, box, juce::Justification::centred, text);
     }
 }
 
