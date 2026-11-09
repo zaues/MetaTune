@@ -85,8 +85,8 @@ scripts/test.sh       # native unit tests
 
 ## Documentation
 
-Full user guide, DSP design, latency tables, measurements, known limitations and roadmap:
-**[MetaTune.md](MetaTune.md)**.
+- **[User Guide](USER_GUIDE.md)** — how to use every feature: keys, controls, the Doubler, Groups, presets and more.
+- **[MetaTune.md](MetaTune.md)** — DSP design, latency tables, measurements, known limitations and roadmap.
 
 ## License
 
