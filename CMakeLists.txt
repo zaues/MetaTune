@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(MetaTune VERSION 0.5.6 LANGUAGES C CXX)
+project(MetaTune VERSION 0.5.7 LANGUAGES C CXX)
 
 # Product naming lives here only; DSP code never refers to it.
 set(PRODUCT_NAME "MetaTune" CACHE STRING "User-visible plugin name")
@@ -101,6 +101,11 @@ target_compile_definitions(MetaTuneUpdater PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_C
 target_link_libraries(MetaTuneUpdater
     PRIVATE MetaTuneAssets juce::juce_gui_basics juce::juce_cryptography shell32
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
+
+# Dev tool: offline accuracy check for the key detector.
+add_executable(keytest Tools/keytest.cpp Source/MetaKey/KeyDetector.cpp)
+target_link_libraries(keytest PRIVATE juce::juce_dsp juce::juce_recommended_config_flags)
+set_target_properties(keytest PROPERTIES WIN32_EXECUTABLE FALSE)
 
 # Dev tool: render MetaKey's editor to PNG (not installed, not part of the plugin).
 add_executable(metakey_snapshot Tools/metakey_snapshot.cpp)

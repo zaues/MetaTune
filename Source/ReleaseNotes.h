@@ -6,6 +6,8 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.5.7",
+      "- MetaKey is much more accurate: it now reads only the tonal peaks in the sound and ignores drums and noise, so it locks onto the real key instead of being thrown off by the beat." },
     { "0.5.6",
       "- New companion plugin: MetaKey, a key detector, is now installed alongside MetaTune.\n"
       "- MetaKey finds the key of a beat by Listening to a mixer track, from an audio File you load, or Manually.\n"

@@ -40,22 +40,46 @@ void KeyDetector::processFrame (const float* windowed)
     std::copy (windowed, windowed + kSize, fftData.begin());
     fft.performFrequencyOnlyForwardTransform (fftData.data()); // magnitudes in bins [0 .. kSize/2]
 
+    const int nBins = kSize / 2;
+    float maxMag = 0.0f;
+    for (int b = 1; b < nBins; ++b) maxMag = juce::jmax (maxMag, fftData[(size_t) b]);
+    if (maxMag < 1.0e-6f) return; // silence
+
+    // Only spectral PEAKS (local maxima above a floor) contribute: tonal content has sharp peaks, while
+    // drums / broadband noise do not, so this keeps percussion from flattening the chromagram.
     const double binHz = sr / double (kSize);
+    const float floorMag = maxMag * 0.04f;
     double frameEnergy = 0.0;
     std::array<double, 12> frameChroma {};
-    for (int bin = 1; bin < kSize / 2; ++bin)
+    for (int b = 2; b < nBins - 1; ++b)
     {
-        const double f = binHz * double (bin);
-        if (f < 55.0 || f > 2000.0) continue; // the pitched range that carries key information
+        const float m = fftData[(size_t) b];
+        if (m < floorMag) continue;
+        const float lo = fftData[(size_t) (b - 1)], hi = fftData[(size_t) (b + 1)];
+        if (! (m > lo && m >= hi)) continue; // local peak
+
+        // Parabolic interpolation for a more accurate peak frequency.
+        const float denom = lo - 2.0f * m + hi;
+        const float delta = std::abs (denom) > 1.0e-9f ? 0.5f * (lo - hi) / denom : 0.0f;
+        const double f = binHz * (double (b) + (double) juce::jlimit (-0.5f, 0.5f, delta));
+        if (f < 60.0 || f > 2000.0) continue;
+
+        // Emphasise the mid band where harmony lives; taper sub-bass (kick) and highs (cymbals).
+        double w = 1.0;
+        if (f < 130.0)       w = juce::jmax (0.25, f / 130.0);
+        else if (f > 1000.0) w = juce::jmax (0.2, 1.0 - (f - 1000.0) / 2500.0);
+
         const double midi = 69.0 + 12.0 * std::log2 (f / 440.0);
-        const int pc = ((int) std::llround (midi) % 12 + 12) % 12;
-        const double mag = (double) fftData[(size_t) bin];
+        double pcf = std::fmod (midi, 12.0);
+        if (pcf < 0.0) pcf += 12.0;
+        const int pc = ((int) std::llround (pcf)) % 12;
+        const double mag = std::sqrt ((double) m) * w; // compress so one loud peak can't dominate
         frameChroma[(size_t) pc] += mag;
         frameEnergy += mag;
     }
-    if (frameEnergy < 1.0e-6) return; // silence: ignore so it doesn't dilute the estimate
+    if (frameEnergy < 1.0e-9) return; // no tonal peaks this frame
     for (int i = 0; i < 12; ++i)
-        chromaAcc[(size_t) i] += frameChroma[(size_t) i] / frameEnergy; // normalise each frame's weight
+        chromaAcc[(size_t) i] += frameChroma[(size_t) i] / frameEnergy; // each frame weighted equally
     frames += 1.0;
 }
 
