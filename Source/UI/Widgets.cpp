@@ -694,16 +694,15 @@ void PresetPanel::paint (juce::Graphics& g)
         if (row.kind == Kind::Section)
         {
             if (row.text.isEmpty()) { g.setColour (juce::Colours::white.withAlpha (0.08f)); g.fillRect (r.getX() + 6.0f, r.getCentreY(), r.getWidth() - 12.0f, 1.0f); }
-            else { g.setColour (textFaint.brighter (0.2f)); g.setFont (font (11.5f, true)); g.drawText (row.text.toUpperCase(), r.withTrimmedLeft (10.0f), juce::Justification::centredLeft); }
+            else { g.setFont (font (11.5f, true)); shadowText (g, row.text.toUpperCase(), r.withTrimmedLeft (10.0f), juce::Justification::centredLeft, textFaint.brighter (0.2f)); }
             if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.5f)); g.drawRoundedRectangle (r.reduced (3.0f, 1.0f), 4.0f, 1.4f); }
             continue;
         }
         if (row.kind == Kind::Folder)
         {
             if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.22f)); g.fillRoundedRectangle (r.reduced (2.0f, 1.0f), 4.0f); }
-            g.setColour (textDim.interpolatedWith (text, i == hot ? 1.0f : 0.35f));
             g.setFont (font (12.0f, true));
-            g.drawText (juce::String::fromUTF8 ("\xF0\x9F\x93\x81  ") + row.text.toUpperCase(), r.withTrimmedLeft (10.0f).withTrimmedRight (50.0f), juce::Justification::centredLeft);
+            shadowText (g, juce::String::fromUTF8 ("\xF0\x9F\x93\x81  ") + row.text.toUpperCase(), r.withTrimmedLeft (10.0f).withTrimmedRight (50.0f), juce::Justification::centredLeft, textDim.interpolatedWith (text, i == hot ? 1.0f : 0.35f));
             if (i == hot && ! dragging)
             {
                 const auto pb = plusBounds (r);
@@ -718,9 +717,8 @@ void PresetPanel::paint (juce::Graphics& g)
         {
             auto& a = rowAnim (i); a.setTarget (i == hot ? 1.0f : 0.0f);
             if (a.get() > 0.0f) { g.setColour (juce::Colours::white.withAlpha (0.06f * a.get())); g.fillRoundedRectangle (r.reduced (0.0f, 1.5f), 4.0f); }
-            g.setColour (textDim.interpolatedWith (text, juce::jmax (0.55f, a.get())));
             g.setFont (font (13.0f, true));
-            g.drawText (row.text, r.withTrimmedLeft (22.0f), juce::Justification::centredLeft);
+            shadowText (g, row.text, r.withTrimmedLeft (22.0f), juce::Justification::centredLeft, textDim.interpolatedWith (text, juce::jmax (0.55f, a.get())));
             continue;
         }
 
@@ -735,9 +733,8 @@ void PresetPanel::paint (juce::Graphics& g)
             g.drawRoundedRectangle (rr, 4.0f, 1.0f);
         }
         if (isCurrent) { g.setColour (violet.brighter (0.3f)); g.fillEllipse (r.getX() + 9.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f); }
-        g.setColour (isCurrent ? text : textDim.interpolatedWith (text, a.get()));
         g.setFont (font (13.5f, isCurrent));
-        g.drawText (row.text, r.withTrimmedLeft (22.0f).withTrimmedRight (26.0f), juce::Justification::centredLeft);
+        shadowText (g, row.text, r.withTrimmedLeft (22.0f).withTrimmedRight (26.0f), juce::Justification::centredLeft, isCurrent ? text : textDim.interpolatedWith (text, a.get()));
         if (i == hot && ! row.factory && ! dragging) drawTrash (g, trashBounds (r));
     }
 
@@ -750,9 +747,8 @@ void PresetPanel::paint (juce::Graphics& g)
         g.drawRoundedRectangle (box, 5.0f, 1.0f);
         juce::String nm;
         for (const auto& rr : rows) if (rr.index == dragIndex) nm = rr.text;
-        g.setColour (text);
         g.setFont (font (12.5f, true));
-        g.drawText (nm, box, juce::Justification::centred);
+        shadowText (g, nm, box, juce::Justification::centred, text);
     }
 }
 
@@ -895,30 +891,26 @@ void GroupBrowser::paint (juce::Graphics& g)
         if (row.kind == Kind::GroupHeader)
         {
             if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.22f)); g.fillRoundedRectangle (r.reduced (1.0f), 4.0f); }
-            g.setColour (row.group < 0 ? textFaint.brighter (0.2f) : (i == hot && ! dragging ? violet.brighter (0.4f) : text));
             g.setFont (font (12.5f, true));
-            g.drawText (row.text.toUpperCase(), r.withTrimmedLeft (10.0f).withTrimmedRight (54.0f), juce::Justification::centredLeft);
+            shadowText (g, row.text.toUpperCase(), r.withTrimmedLeft (10.0f).withTrimmedRight (54.0f), juce::Justification::centredLeft, row.group < 0 ? textFaint.brighter (0.2f) : (i == hot && ! dragging ? violet.brighter (0.4f) : text));
             if (row.group >= 0 && i == hot && ! dragging)
             {
-                g.setColour (textDim);
                 g.setFont (font (10.5f, true));
-                g.drawText ("rename", r.withTrimmedRight (10.0f), juce::Justification::centredRight);
+                shadowText (g, "rename", r.withTrimmedRight (10.0f), juce::Justification::centredRight, textDim);
             }
             continue;
         }
         if (row.kind == Kind::Empty)
         {
-            g.setColour (textFaint.withAlpha (0.5f));
             g.setFont (font (11.5f, false));
-            g.drawText (juce::String::fromUTF8 ("\xE2\x80\x94 empty \xE2\x80\x94"), r.withTrimmedLeft (26.0f), juce::Justification::centredLeft);
+            shadowText (g, juce::String::fromUTF8 ("\xE2\x80\x94 empty \xE2\x80\x94"), r.withTrimmedLeft (26.0f), juce::Justification::centredLeft, textFaint.withAlpha (0.5f));
             continue;
         }
         auto& a = rowAnim (i); a.setTarget (i == hot ? 1.0f : 0.0f);
         if (a.get() > 0.0f) { g.setColour (juce::Colours::white.withAlpha (0.06f * a.get())); g.fillRoundedRectangle (r.reduced (0.0f, 1.5f), 4.0f); }
         if (row.self) { g.setColour (violet.brighter (0.3f)); g.fillEllipse (r.getX() + 12.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f); }
-        g.setColour (textDim.interpolatedWith (text, juce::jmax (row.self ? 0.9f : 0.5f, a.get())));
         g.setFont (font (13.0f, row.self));
-        g.drawText (row.text + (row.self ? juce::String ("  (this)") : juce::String()), r.withTrimmedLeft (26.0f), juce::Justification::centredLeft);
+        shadowText (g, row.text + (row.self ? juce::String ("  (this)") : juce::String()), r.withTrimmedLeft (26.0f), juce::Justification::centredLeft, textDim.interpolatedWith (text, juce::jmax (row.self ? 0.9f : 0.5f, a.get())));
     }
 
     if (dragging && dragId >= 0)
@@ -930,8 +922,8 @@ void GroupBrowser::paint (juce::Graphics& g)
         g.fillRoundedRectangle (box, 5.0f);
         g.setColour (violet.withAlpha (0.6f));
         g.drawRoundedRectangle (box, 5.0f, 1.0f);
-        g.setColour (text); g.setFont (font (12.5f, true));
-        g.drawText (nm, box, juce::Justification::centred);
+        g.setFont (font (12.5f, true));
+        shadowText (g, nm, box, juce::Justification::centred, text);
     }
 }
 
@@ -1020,13 +1012,11 @@ void SavePresetCard::paint (juce::Graphics& g)
     g.fillPath (p);
     g.setColour (juce::Colours::white.withAlpha (0.08f));
     g.strokePath (p, juce::PathStrokeType (1.0f));
-    g.setColour (text);
     g.setFont (font (17.0f, true));
-    g.drawText ("Save preset", c.withHeight (52.0f).withTrimmedTop (14.0f), juce::Justification::centred);
-    g.setColour (message.isEmpty() ? textDim : warn);
+    shadowText (g, "Save preset", c.withHeight (52.0f).withTrimmedTop (14.0f), juce::Justification::centred, text);
     g.setFont (font (12.5f));
-    g.drawText (message.isEmpty() ? juce::String ("Name for this preset") : message,
-                c.withTrimmedTop (42.0f).withHeight (20.0f), juce::Justification::centred);
+    shadowText (g, message.isEmpty() ? juce::String ("Name for this preset") : message,
+                c.withTrimmedTop (42.0f).withHeight (20.0f), juce::Justification::centred, message.isEmpty() ? textDim : warn);
 }
 
 void SavePresetCard::mouseUp (const juce::MouseEvent& e)
@@ -1095,17 +1085,15 @@ void SettingsPanel::paint (juce::Graphics& g)
             }
             else
             {
-                g.setColour (textFaint.brighter (0.2f));
                 g.setFont (font (11.5f, true));
-                g.drawText (it.text.toUpperCase(), r.withTrimmedLeft (10.0f), juce::Justification::centredLeft);
+                shadowText (g, it.text.toUpperCase(), r.withTrimmedLeft (10.0f), juce::Justification::centredLeft, textFaint.brighter (0.2f));
             }
             continue;
         }
         if (it.kind == Item::Kind::Info)
         {
-            g.setColour (textFaint);
             g.setFont (font (12.0f));
-            g.drawText (it.text, r.withTrimmedLeft (22.0f), juce::Justification::centredLeft);
+            shadowText (g, it.text, r.withTrimmedLeft (22.0f), juce::Justification::centredLeft, textFaint);
             continue;
         }
         auto& a = rowAnim (i);
@@ -1123,14 +1111,12 @@ void SettingsPanel::paint (juce::Graphics& g)
             g.setColour (violet.brighter (0.3f));
             g.fillEllipse (r.getX() + 9.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f);
         }
-        g.setColour (it.current ? text : textDim.interpolatedWith (text, a.get()));
         g.setFont (font (13.5f, it.current));
-        g.drawText (it.text, r.withTrimmedLeft (22.0f), juce::Justification::centredLeft);
+        shadowText (g, it.text, r.withTrimmedLeft (22.0f), juce::Justification::centredLeft, it.current ? text : textDim.interpolatedWith (text, a.get()));
         if (it.detail.isNotEmpty())
         {
-            g.setColour (textFaint.brighter (0.3f));
             g.setFont (font (12.0f));
-            g.drawText (it.detail, r.withTrimmedRight (10.0f), juce::Justification::centredRight);
+            shadowText (g, it.detail, r.withTrimmedRight (10.0f), juce::Justification::centredRight, textFaint.brighter (0.3f));
         }
     }
 }
