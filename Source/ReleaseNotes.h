@@ -6,6 +6,10 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.4.2",
+      "- The box icon slides its browser open and now greys out while the browser is showing, like a selected tab.\n"
+      "- New preset-browser toolbar: New preset, New folder, Search (filter by name), Open folder and Favourites.\n"
+      "- Star any preset to favourite it, then use the star in the toolbar to show only your favourites." },
     { "0.4.1",
       "- The box icon above the group tabs now opens a tabbed browser with both Presets and Groups, so you can reach your presets from there too.\n"
       "- More space between the Doubler Dry/Wet label and its guide line." },

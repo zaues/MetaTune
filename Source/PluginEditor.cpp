@@ -82,6 +82,22 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     presetPanel.onSaveToFolder = [this] (const juce::String& f) { showBrowser (false); pendingSave = PendingSave::Preset; pendingFolder = f; saveCard.open (proc.ui.presetName); };
     presetPanel.onNewFolder = [this] { showBrowser (false); pendingSave = PendingSave::Folder; pendingFolder = {}; saveCard.open ({}); };
     presetPanel.onDelete = [this] (int i) { proc.deletePreset (i); refreshPresetPanel(); };
+    presetPanel.onHeightChanged = [this] {
+        using namespace layout;
+        const int x = 54, y = headerH + 2, w = 288, th = 26;
+        const int maxH = rowY - (y + th) - 10;
+        if (presetPanel.isVisible())
+            presetPanel.setBounds (x, y + th, w, juce::jmin (presetPanel.preferredHeight(), maxH));
+    };
+    presetPanel.onToggleFavorite = [this] (int i) {
+        const auto list = proc.presetList();
+        if (juce::isPositiveAndBelow (i, int (list.size())))
+        {
+            const auto& e = list[size_t (i)];
+            update::Settings::setFavorite (e.folder, e.name, ! update::Settings::isFavorite (e.folder, e.name));
+            refreshPresetPanel();
+        }
+    };
     presetPanel.onDeleteFolder = [this] (const juce::String& f) { proc.deleteFolder (f); refreshPresetPanel(); };
     presetPanel.onMove = [this] (int i, const juce::String& f) { proc.movePreset (i, f); refreshPresetPanel(); };
     presetPanel.onOpenFolder = [this] {
@@ -759,7 +775,8 @@ void MetaTuneEditor::updatePicker()
 void MetaTuneEditor::mouseDown (const juce::MouseEvent& e)
 {
     if (browserTabs.isVisible() && e.eventComponent != &presetPanel && e.eventComponent != &groupBrowser
-        && e.eventComponent != &browserTabs && e.eventComponent != &presetBar && e.eventComponent != &groups)
+        && e.eventComponent != &browserTabs && e.eventComponent != &presetBar && e.eventComponent != &groups
+        && ! presetPanel.isParentOf (e.eventComponent) && ! groupBrowser.isParentOf (e.eventComponent))
         showBrowser (false);
     if (settingsPanel.isVisible() && e.eventComponent != &settingsPanel && e.eventComponent != &menuButton)
         showSettingsPanel (false);
@@ -806,35 +823,69 @@ void MetaTuneEditor::applyPickedScale (int index)
 void MetaTuneEditor::showBrowser (bool show, int tab)
 {
     using namespace layout;
+    auto& animator = juce::Desktop::getInstance().getAnimator();
     if (tab >= 0) browserTabs.setTab (tab);
+    const int x = 54, y = headerH + 2, w = 288, th = 26;
+
     if (! show)
     {
+        if (browserTabs.isVisible())
+        {
+            animator.animateComponent (&browserTabs, browserTabs.getBounds().translated (0, -8), 0.0f, 120, true, 1.0, 1.0);
+            if (presetPanel.isVisible()) animator.animateComponent (&presetPanel, presetPanel.getBounds().translated (0, -8), 0.0f, 120, true, 1.0, 1.0);
+            if (groupBrowser.isVisible()) animator.animateComponent (&groupBrowser, groupBrowser.getBounds().translated (0, -8), 0.0f, 120, true, 1.0, 1.0);
+        }
         browserTabs.setVisible (false);
         presetPanel.setVisible (false);
         groupBrowser.setVisible (false);
+        groups.setBrowseActive (false);
         return;
     }
     showSettingsPanel (false);
     showColorPanel (false);
-    const int x = 54, y = headerH + 2, w = 288, th = 26;
-    browserTabs.setBounds (x, y, w, th);
-    browserTabs.setVisible (true);
-    browserTabs.toFront (false);
+    groups.setBrowseActive (true);
+
+    const bool wasOpen = browserTabs.isVisible();
+    const juce::Rectangle<int> tabsOpen (x, y, w, th);
+    if (! wasOpen)
+    {
+        browserTabs.setBounds (tabsOpen.translated (0, -10));
+        browserTabs.setAlpha (0.0f);
+        browserTabs.setVisible (true);
+        browserTabs.toFront (false);
+        animator.animateComponent (&browserTabs, tabsOpen, 1.0f, 170, false, 0.0, 0.0);
+    }
+    else
+    {
+        animator.cancelAnimation (&browserTabs, false);
+        browserTabs.setBounds (tabsOpen);
+        browserTabs.setAlpha (1.0f);
+        browserTabs.setVisible (true);
+        browserTabs.toFront (false);
+    }
+
     const int maxH = rowY - (y + th) - 10;
+    auto slideIn = [&] (juce::Component& c, int ph)
+    {
+        const juce::Rectangle<int> open (x, y + th, w, juce::jmin (ph, maxH));
+        animator.cancelAnimation (&c, false);
+        c.setBounds (open.translated (0, -10));
+        c.setAlpha (0.0f);
+        c.setVisible (true);
+        c.toFront (false);
+        animator.animateComponent (&c, open, 1.0f, 170, false, 0.0, 0.0);
+    };
+
     if (browserTabs.getTab() == 0)
     {
         refreshPresetPanel();
-        presetPanel.setBounds (x, y + th, w, juce::jmin (presetPanel.preferredHeight(), maxH));
-        presetPanel.setVisible (true);
-        presetPanel.toFront (false);
+        slideIn (presetPanel, presetPanel.preferredHeight());
         groupBrowser.setVisible (false);
     }
     else
     {
         refreshGroupBrowser();
-        groupBrowser.setBounds (x, y + th, w, juce::jmin (groupBrowser.preferredHeight(), maxH));
-        groupBrowser.setVisible (true);
-        groupBrowser.toFront (false);
+        slideIn (groupBrowser, groupBrowser.preferredHeight());
         presetPanel.setVisible (false);
     }
 }
@@ -850,6 +901,7 @@ void MetaTuneEditor::showColorPanel (bool show)
     {
         colorPanel.setValues (update::Settings::accentHue(), update::Settings::accentSat(), update::Settings::accentBright());
         showSettingsPanel (false);
+        showBrowser (false);
         showPresetPanel (false);
         colorPanel.setBounds (tucked);
         colorPanel.setAlpha (0.0f);
@@ -897,6 +949,7 @@ void MetaTuneEditor::showSettingsPanel (bool show)
     const juce::Rectangle<int> open (54, layout::headerH + 2, 240, settingsPanel.preferredHeight()), tucked = open.translated (0, -12);
     if (show)
     {
+        showBrowser (false);
         showPresetPanel (false);
         settingsPanel.setBounds (tucked);
         settingsPanel.setAlpha (0.0f);
@@ -981,7 +1034,7 @@ void MetaTuneEditor::refreshPresetPanel()
 {
     std::vector<PresetItem> items;
     for (const auto& e : proc.presetList())
-        items.push_back ({ e.name, e.folder, e.factory });
+        items.push_back ({ e.name, e.folder, e.factory, update::Settings::isFavorite (e.folder, e.name) });
     presetPanel.setItems (items, proc.ui.presetName);
 }
 

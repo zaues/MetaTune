@@ -46,6 +46,9 @@ struct Settings
     static float accentSat();
     static float accentBright();
     static void setAccentPrefs (float hue, float sat, float bright);
+    // Favourite presets (global): a set of folder+name keys, toggled from the preset browser.
+    static bool isFavorite (const juce::String& folder, const juce::String& name);
+    static void setFavorite (const juce::String& folder, const juce::String& name, bool on);
 };
 
 // Copies the updater to %TEMP% (the installer replaces the original while it runs) and starts it

@@ -119,6 +119,23 @@ void Settings::setAccentPrefs (float hue, float sat, float bright)
     props().saveIfNeeded();
 }
 
+static juce::String favKey (const juce::String& folder, const juce::String& name) { return folder + "\t" + name; }
+
+bool Settings::isFavorite (const juce::String& folder, const juce::String& name)
+{
+    return juce::StringArray::fromLines (props().getValue ("favorites")).contains (favKey (folder, name));
+}
+
+void Settings::setFavorite (const juce::String& folder, const juce::String& name, bool on)
+{
+    auto f = juce::StringArray::fromLines (props().getValue ("favorites"));
+    f.removeEmptyStrings();
+    f.removeString (favKey (folder, name));
+    if (on) f.add (favKey (folder, name));
+    props().setValue ("favorites", f.joinIntoString ("\n"));
+    props().saveIfNeeded();
+}
+
 std::optional<Release> Settings::cached()
 {
     Release r { props().getValue ("latestVersion"), props().getValue ("latestUrl"), props().getValue ("latestSha256") };

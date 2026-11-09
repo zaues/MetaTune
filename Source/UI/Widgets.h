@@ -130,6 +130,7 @@ public:
     std::function<void()> onBrowse; // the grid icon opens the Group Browser
     void setSelected (int g) { if (g != selected) { selected = g; repaint(); } }
     void setCount (int g, int n) { if (counts[g] != n) { counts[g] = n; repaint(); } }
+    void setBrowseActive (bool a) { if (a != browseActive) { browseActive = a; repaint(); } } // grey the grid/box icon while its browser is open
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override;
@@ -142,6 +143,7 @@ private:
     theme::Anim selAmt[4] { theme::Anim { *this }, theme::Anim { *this }, theme::Anim { *this }, theme::Anim { *this } };
     int selected = -1, hover = -1;
     int counts[4] {};
+    bool browseActive = false;
 };
 
 // Header preset box: "No preset selected", a preset icon and up/down arrows.
@@ -219,7 +221,7 @@ private:
 };
 
 // One preset as the panel sees it (folder "" = root / factory).
-struct PresetItem { juce::String name, folder; bool factory = false; };
+struct PresetItem { juce::String name, folder; bool factory = false; bool favorite = false; };
 
 // Preset list that drops down from the header preset box, inside the plugin window. Factory presets,
 // then user sub-folders (each with a + to save-into and a trash to delete), then root "My presets",
@@ -228,15 +230,19 @@ struct PresetItem { juce::String name, folder; bool factory = false; };
 class PresetPanel : public juce::Component
 {
 public:
+    PresetPanel();
     std::function<void (int index)> onLoad;                               // index into the flat preset list
     std::function<void()> onNewPreset, onNewFolder, onOpenFolder, onMouseLeave;
     std::function<void (const juce::String& folder)> onSaveToFolder;      // save current preset into a folder
     std::function<void (int index)> onDelete;                            // trash a user preset
+    std::function<void (int index)> onToggleFavorite;                    // star / unstar a preset
+    std::function<void()> onHeightChanged;                               // search / favourites changed the preferred height
     std::function<void (const juce::String& folder)> onDeleteFolder;     // trash a folder
     std::function<void (int index, const juce::String& folder)> onMove;  // move a preset to a folder ("" = root)
 
     void setItems (const std::vector<PresetItem>& items, const juce::String& current);
     int preferredHeight() const;
+    void resized() override;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -246,19 +252,31 @@ public:
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
 private:
-    enum class Kind { Section, Folder, Preset, NewPreset, NewFolder, OpenFolder };
-    struct Row { Kind kind; juce::String text; juce::String folder; int index = -1; bool factory = false; };
-    static constexpr float kRowH = 26.0f, kHeaderH = 24.0f;
-    float rowHeight (const Row& r) const { return (r.kind == Kind::Section || r.kind == Kind::Folder) ? kHeaderH : kRowH; }
+    enum class Kind { Section, Folder, Preset, Toolbar };
+    struct Row { Kind kind; juce::String text; juce::String folder; int index = -1; bool factory = false; bool favorite = false; };
+    static constexpr float kRowH = 26.0f, kHeaderH = 24.0f, kToolbarH = 42.0f;
+    float rowHeight (const Row& r) const
+    {
+        if (r.kind == Kind::Toolbar) return kToolbarH;
+        return (r.kind == Kind::Section || r.kind == Kind::Folder) ? kHeaderH : kRowH;
+    }
+    float topInset() const { return searchActive ? 34.0f : 0.0f; }
+    void rebuild(); // apply the search / favourites filter to allItems and lay out the rows
     float contentHeight() const;
     int rowAt (juce::Point<float>) const;
     juce::Rectangle<float> rowBounds (int i) const;
     juce::Rectangle<float> trashBounds (juce::Rectangle<float> row) const;
     juce::Rectangle<float> plusBounds (juce::Rectangle<float> row) const;
+    juce::Rectangle<float> starBounds (juce::Rectangle<float> row) const;
+    juce::Rectangle<float> toolBounds (juce::Rectangle<float> row, int i) const; // 0..4 footer icons
+    int toolAt (juce::Rectangle<float> row, juce::Point<float> p) const;
     theme::Anim& rowAnim (int i);
 
+    std::vector<PresetItem> allItems;
     std::vector<Row> rows;
-    juce::String current;
+    juce::String current, filter;
+    bool searchActive = false, favOnly = false;
+    juce::TextEditor searchBox;
     float scroll = 0;
     int dragIndex = -1, dropRow = -1; // dragIndex = preset being dragged; dropRow = folder/section row under cursor
     bool dragging = false;

@@ -331,7 +331,16 @@ void GroupTabs::paint (juce::Graphics& g)
     bg.addRoundedRectangle (b.getX() - 12.0f, b.getY(), b.getWidth() + 12.0f, b.getHeight(), 12.0f);
     g.setColour (juce::Colour (0xff121213));
     g.fillPath (bg);
-    g.setColour (textDim);
+    // Box (grid) icon: a grey "selected" fill sits behind it while its browser is open, like the number tabs.
+    const auto boxCell = juce::Rectangle<float> (b.getX(), b.getY() + 4.0f, b.getWidth(), float (kTop) - 8.0f);
+    if (browseActive)
+    {
+        g.setColour (juce::Colour (0xff252528));
+        g.fillRoundedRectangle (boxCell.reduced (5.0f, 0.0f), 6.0f);
+        g.setColour (juce::Colour (0xffc9ccd4).withAlpha (0.8f));
+        g.fillRect (boxCell.getX() + 5.0f, boxCell.getY() + 6.0f, 2.0f, boxCell.getHeight() - 12.0f);
+    }
+    g.setColour (browseActive ? text : textDim);
     juce::Path gi = icons::grid();
     g.fillPath (gi, gi.getTransformToScaleToFit (juce::Rectangle<float> (20.0f, 20.0f).withCentre ({ b.getCentreX(), float (kTop) * 0.55f }), true));
 
@@ -601,39 +610,87 @@ void RootPicker::mouseUp (const juce::MouseEvent& e)
         if (scaleRect (i).contains (e.position)) { if (onScale) onScale (i); return; } // stays open; hovering out closes it
 }
 
+PresetPanel::PresetPanel()
+{
+    addChildComponent (searchBox);
+    searchBox.setTextToShowWhenEmpty ("Search presets", theme::textDim);
+    searchBox.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff141416));
+    searchBox.setColour (juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha (0.12f));
+    searchBox.setColour (juce::TextEditor::focusedOutlineColourId, theme::violet.withAlpha (0.7f));
+    searchBox.setColour (juce::TextEditor::textColourId, theme::text);
+    searchBox.setColour (juce::TextEditor::highlightColourId, theme::violet.withAlpha (0.35f));
+    searchBox.setFont (theme::font (13.0f));
+    searchBox.setJustification (juce::Justification::centredLeft);
+    searchBox.onTextChange = [this] { filter = searchBox.getText().trim(); rebuild(); };
+    searchBox.onEscapeKey  = [this] { searchBox.setText ({}, false); filter = {}; searchActive = false;
+                                      searchBox.setVisible (false); rebuild(); repaint(); };
+}
+
+void PresetPanel::resized()
+{
+    searchBox.setBounds (10, 6, juce::jmax (0, getWidth() - 20), 24);
+}
+
 void PresetPanel::setItems (const std::vector<PresetItem>& items, const juce::String& cur)
 {
-    rows.clear();
-    int idx = 0;
-    rows.push_back ({ Kind::Section, "Factory", {}, -1, false });
-    for (; idx < int (items.size()) && items[size_t (idx)].factory; ++idx)
-        rows.push_back ({ Kind::Preset, items[size_t (idx)].name, {}, idx, true });
-
-    juce::String curFolder;
-    for (; idx < int (items.size()) && items[size_t (idx)].folder.isNotEmpty(); ++idx)
-    {
-        const auto& it = items[size_t (idx)];
-        if (it.folder != curFolder) { rows.push_back ({ Kind::Folder, it.folder, it.folder, -1, false }); curFolder = it.folder; }
-        rows.push_back ({ Kind::Preset, it.name, it.folder, idx, false });
-    }
-    bool rootHeader = false;
-    for (; idx < int (items.size()); ++idx)
-    {
-        if (! rootHeader) { rows.push_back ({ Kind::Section, "My presets", {}, -1, false }); rootHeader = true; }
-        rows.push_back ({ Kind::Preset, items[size_t (idx)].name, {}, idx, false });
-    }
-    rows.push_back ({ Kind::Section, {}, {}, -1, false });
-    rows.push_back ({ Kind::NewPreset, "New preset...", {}, -1, false });
-    rows.push_back ({ Kind::NewFolder, "New folder...", {}, -1, false });
-    rows.push_back ({ Kind::OpenFolder, "Open presets folder", {}, -1, false });
+    allItems = items;
     current = cur;
+    rebuild();
+}
+
+void PresetPanel::rebuild()
+{
+    rows.clear();
+    const int n = int (allItems.size());
+    const auto match = [this] (const PresetItem& it)
+    {
+        if (favOnly && ! it.favorite) return false;
+        if (filter.isNotEmpty() && ! it.name.containsIgnoreCase (filter)) return false;
+        return true;
+    };
+
+    int idx = 0;
+    bool facHeader = false;
+    for (; idx < n && allItems[size_t (idx)].factory; ++idx)
+    {
+        const auto& it = allItems[size_t (idx)];
+        if (! match (it)) continue;
+        if (! facHeader) { rows.push_back ({ Kind::Section, "Factory", {}, -1, false, false }); facHeader = true; }
+        rows.push_back ({ Kind::Preset, it.name, {}, idx, true, it.favorite });
+    }
+
+    juce::String curFolder; bool folderHeader = false;
+    for (; idx < n && allItems[size_t (idx)].folder.isNotEmpty(); ++idx)
+    {
+        const auto& it = allItems[size_t (idx)];
+        if (it.folder != curFolder) { curFolder = it.folder; folderHeader = false; }
+        if (! match (it)) continue;
+        if (! folderHeader) { rows.push_back ({ Kind::Folder, curFolder, curFolder, -1, false, false }); folderHeader = true; }
+        rows.push_back ({ Kind::Preset, it.name, it.folder, idx, false, it.favorite });
+    }
+
+    bool rootHeader = false;
+    for (; idx < n; ++idx)
+    {
+        const auto& it = allItems[size_t (idx)];
+        if (! match (it)) continue;
+        if (! rootHeader) { rows.push_back ({ Kind::Section, "My presets", {}, -1, false, false }); rootHeader = true; }
+        rows.push_back ({ Kind::Preset, it.name, {}, idx, false, it.favorite });
+    }
+
+    if (rows.empty() && (favOnly || filter.isNotEmpty()))
+        rows.push_back ({ Kind::Section, favOnly ? "No favourites yet" : "No matches", {}, -1, false, false });
+
+    rows.push_back ({ Kind::Section, {}, {}, -1, false, false }); // divider above the toolbar
+    rows.push_back ({ Kind::Toolbar, {}, {}, -1, false, false });
+
     scroll = juce::jlimit (0.0f, juce::jmax (0.0f, contentHeight() - float (getHeight())), scroll);
     repaint();
 }
 
 float PresetPanel::contentHeight() const
 {
-    float h = 6.0f;
+    float h = 6.0f + topInset();
     for (const auto& r : rows) h += rowHeight (r);
     return h + 6.0f;
 }
@@ -648,7 +705,7 @@ theme::Anim& PresetPanel::rowAnim (int i)
 
 juce::Rectangle<float> PresetPanel::rowBounds (int i) const
 {
-    float y = 6.0f - scroll;
+    float y = 6.0f + topInset() - scroll;
     for (int j = 0; j < i && j < int (rows.size()); ++j) y += rowHeight (rows[size_t (j)]);
     const float h = juce::isPositiveAndBelow (i, int (rows.size())) ? rowHeight (rows[size_t (i)]) : kRowH;
     return { 6.0f, y, float (getWidth()) - 12.0f, h };
@@ -656,10 +713,25 @@ juce::Rectangle<float> PresetPanel::rowBounds (int i) const
 
 juce::Rectangle<float> PresetPanel::trashBounds (juce::Rectangle<float> r) const { return { r.getRight() - 23.0f, r.getCentreY() - 7.0f, 15.0f, 15.0f }; }
 juce::Rectangle<float> PresetPanel::plusBounds (juce::Rectangle<float> r) const { return { r.getRight() - 44.0f, r.getCentreY() - 7.0f, 15.0f, 15.0f }; }
+juce::Rectangle<float> PresetPanel::starBounds (juce::Rectangle<float> r) const { return { r.getRight() - 45.0f, r.getCentreY() - 8.0f, 16.0f, 16.0f }; }
+
+juce::Rectangle<float> PresetPanel::toolBounds (juce::Rectangle<float> r, int i) const
+{
+    const float sz = 24.0f, gap = 16.0f, n = 5.0f;
+    const float total = n * sz + (n - 1.0f) * gap;
+    const float x0 = r.getCentreX() - total * 0.5f;
+    return { x0 + float (i) * (sz + gap), r.getCentreY() - sz * 0.5f, sz, sz };
+}
+
+int PresetPanel::toolAt (juce::Rectangle<float> r, juce::Point<float> p) const
+{
+    for (int i = 0; i < 5; ++i) if (toolBounds (r, i).expanded (6.0f).contains (p)) return i;
+    return -1;
+}
 
 int PresetPanel::rowAt (juce::Point<float> p) const
 {
-    float y = 6.0f - scroll;
+    float y = 6.0f + topInset() - scroll;
     for (int i = 0; i < int (rows.size()); ++i)
     {
         const float h = rowHeight (rows[size_t (i)]);
@@ -677,6 +749,71 @@ static void drawTrash (juce::Graphics& g, juce::Rectangle<float> t)
     g.drawLine (t.getCentreX() - 1.5f, t.getY() + 1.0f, t.getCentreX() + 1.5f, t.getY() + 1.0f, 1.3f); // handle
 }
 
+static void drawStar (juce::Graphics& g, juce::Rectangle<float> b, bool filled, juce::Colour c)
+{
+    const auto ctr = b.getCentre();
+    const float ro = b.getWidth() * 0.5f, ri = ro * 0.42f;
+    juce::Path star;
+    for (int i = 0; i < 10; ++i)
+    {
+        const float a = -juce::MathConstants<float>::halfPi + float (i) * (juce::MathConstants<float>::pi / 5.0f);
+        const float rad = (i & 1) ? ri : ro;
+        const juce::Point<float> pt { ctr.x + std::cos (a) * rad, ctr.y + std::sin (a) * rad };
+        if (i == 0) star.startNewSubPath (pt); else star.lineTo (pt);
+    }
+    star.closeSubPath();
+    g.setColour (c);
+    if (filled) g.fillPath (star);
+    else        g.strokePath (star, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
+
+// Footer toolbar glyph: 0 new preset, 1 new folder, 2 search, 3 open folder (home), 4 favourites.
+static void drawToolIcon (juce::Graphics& g, juce::Rectangle<float> r, int idx, juce::Colour c, bool active)
+{
+    g.setColour (c);
+    const auto ctr = r.getCentre();
+    switch (idx)
+    {
+        case 0:
+            g.drawLine (ctr.x - 6.0f, ctr.y, ctr.x + 6.0f, ctr.y, 1.8f);
+            g.drawLine (ctr.x, ctr.y - 6.0f, ctr.x, ctr.y + 6.0f, 1.8f);
+            break;
+        case 1:
+        {
+            juce::Path f;
+            f.startNewSubPath (r.getX() + 2.0f, r.getBottom() - 3.0f);
+            f.lineTo (r.getX() + 2.0f, r.getY() + 5.0f);
+            f.lineTo (r.getX() + 8.0f, r.getY() + 5.0f);
+            f.lineTo (r.getX() + 10.0f, r.getY() + 8.0f);
+            f.lineTo (r.getRight() - 2.0f, r.getY() + 8.0f);
+            f.lineTo (r.getRight() - 2.0f, r.getBottom() - 3.0f);
+            f.closeSubPath();
+            g.strokePath (f, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.drawLine (ctr.x - 3.0f, ctr.y + 3.0f, ctr.x + 3.0f, ctr.y + 3.0f, 1.3f);
+            g.drawLine (ctr.x, ctr.y, ctr.x, ctr.y + 6.0f, 1.3f);
+            break;
+        }
+        case 2:
+            g.drawEllipse (r.getX() + 3.0f, r.getY() + 3.0f, 11.0f, 11.0f, 1.6f);
+            g.drawLine (r.getX() + 13.0f, r.getY() + 13.0f, r.getRight() - 2.0f, r.getBottom() - 2.0f, 1.8f);
+            break;
+        case 3:
+        {
+            juce::Path roof;
+            roof.startNewSubPath (r.getX() + 2.0f, ctr.y);
+            roof.lineTo (ctr.x, r.getY() + 3.0f);
+            roof.lineTo (r.getRight() - 2.0f, ctr.y);
+            g.strokePath (roof, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.drawRect (r.getX() + 4.5f, ctr.y, r.getWidth() - 9.0f, r.getBottom() - ctr.y - 3.0f, 1.3f);
+            break;
+        }
+        case 4:
+            drawStar (g, r.reduced (3.0f), active, c);
+            break;
+        default: break;
+    }
+}
+
 void PresetPanel::paint (juce::Graphics& g)
 {
     using namespace theme;
@@ -690,7 +827,7 @@ void PresetPanel::paint (juce::Graphics& g)
     g.strokePath (bg, juce::PathStrokeType (1.0f));
 
     juce::Graphics::ScopedSaveState ss (g);
-    g.reduceClipRegion (getLocalBounds());
+    g.reduceClipRegion (getLocalBounds().withTrimmedTop (int (topInset())));
     const auto mouse = getMouseXYRelative().toFloat();
     const int hot = isMouseOver (true) ? rowAt (mouse) : -1;
 
@@ -705,6 +842,20 @@ void PresetPanel::paint (juce::Graphics& g)
             if (row.text.isEmpty()) { g.setColour (juce::Colours::white.withAlpha (0.08f)); g.fillRect (r.getX() + 6.0f, r.getCentreY(), r.getWidth() - 12.0f, 1.0f); }
             else { g.setFont (font (11.5f, true)); shadowText (g, row.text.toUpperCase(), r.withTrimmedLeft (10.0f), juce::Justification::centredLeft, textFaint.brighter (0.2f)); }
             if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.5f)); g.drawRoundedRectangle (r.reduced (3.0f, 1.0f), 4.0f, 1.4f); }
+            continue;
+        }
+        if (row.kind == Kind::Toolbar)
+        {
+            for (int t = 0; t < 5; ++t)
+            {
+                const auto ib = toolBounds (r, t);
+                const bool over = i == hot && ib.expanded (6.0f).contains (mouse);
+                const bool act = (t == 2 && searchActive) || (t == 4 && favOnly);
+                if (over) { g.setColour (juce::Colours::white.withAlpha (0.08f)); g.fillRoundedRectangle (ib.expanded (4.0f), 5.0f); }
+                const juce::Colour c = act ? (t == 4 ? juce::Colour (0xffe8c15a) : violet.brighter (0.2f))
+                                           : textDim.interpolatedWith (text, over ? 1.0f : 0.3f);
+                drawToolIcon (g, ib, t, c, act);
+            }
             continue;
         }
         if (row.kind == Kind::Folder)
@@ -722,15 +873,6 @@ void PresetPanel::paint (juce::Graphics& g)
             }
             continue;
         }
-        if (row.kind == Kind::NewPreset || row.kind == Kind::NewFolder || row.kind == Kind::OpenFolder)
-        {
-            auto& a = rowAnim (i); a.setTarget (i == hot ? 1.0f : 0.0f);
-            if (a.get() > 0.0f) { g.setColour (juce::Colours::white.withAlpha (0.06f * a.get())); g.fillRoundedRectangle (r.reduced (0.0f, 1.5f), 4.0f); }
-            g.setFont (font (13.0f, true));
-            shadowText (g, row.text, r.withTrimmedLeft (22.0f), juce::Justification::centredLeft, textDim.interpolatedWith (text, juce::jmax (0.55f, a.get())));
-            continue;
-        }
-
         auto& a = rowAnim (i); a.setTarget (i == hot ? 1.0f : 0.0f);
         const bool isCurrent = row.index >= 0 && row.text == current;
         if (a.get() > 0.0f)
@@ -743,7 +885,9 @@ void PresetPanel::paint (juce::Graphics& g)
         }
         if (isCurrent) { g.setColour (violet.brighter (0.3f)); g.fillEllipse (r.getX() + 9.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f); }
         g.setFont (font (13.5f, isCurrent));
-        shadowText (g, row.text, r.withTrimmedLeft (22.0f).withTrimmedRight (26.0f), juce::Justification::centredLeft, isCurrent ? text : textDim.interpolatedWith (text, a.get()));
+        shadowText (g, row.text, r.withTrimmedLeft (22.0f).withTrimmedRight (48.0f), juce::Justification::centredLeft, isCurrent ? text : textDim.interpolatedWith (text, a.get()));
+        if ((row.favorite || i == hot) && ! dragging)
+            drawStar (g, starBounds (r), row.favorite, row.favorite ? juce::Colour (0xffe8c15a) : text.withAlpha (0.65f));
         if (i == hot && ! row.factory && ! dragging) drawTrash (g, trashBounds (r));
     }
 
@@ -766,7 +910,8 @@ void PresetPanel::mouseDown (const juce::MouseEvent& e)
     downPos = e.position; dragging = false; dragIndex = -1; dropRow = -1;
     const int i = rowAt (e.position);
     if (i >= 0 && rows[size_t (i)].kind == Kind::Preset && ! rows[size_t (i)].factory
-        && ! trashBounds (rowBounds (i)).contains (e.position))
+        && ! trashBounds (rowBounds (i)).contains (e.position)
+        && ! starBounds (rowBounds (i)).contains (e.position))
         dragIndex = rows[size_t (i)].index;
 }
 
@@ -805,15 +950,32 @@ void PresetPanel::mouseUp (const juce::MouseEvent& e)
     {
         case Kind::Preset:
             if (! row.factory && trashBounds (r).contains (e.position)) { if (onDelete) onDelete (row.index); }
+            else if (starBounds (r).contains (e.position)) { if (onToggleFavorite) onToggleFavorite (row.index); }
             else if (onLoad) onLoad (row.index);
             break;
         case Kind::Folder:
             if (plusBounds (r).contains (e.position)) { if (onSaveToFolder) onSaveToFolder (row.folder); }
             else if (trashBounds (r).contains (e.position)) { if (onDeleteFolder) onDeleteFolder (row.folder); }
             break;
-        case Kind::NewPreset:  if (onNewPreset) onNewPreset(); break;
-        case Kind::NewFolder:  if (onNewFolder) onNewFolder(); break;
-        case Kind::OpenFolder: if (onOpenFolder) onOpenFolder(); break;
+        case Kind::Toolbar:
+            switch (toolAt (r, e.position))
+            {
+                case 0: if (onNewPreset) onNewPreset(); break;
+                case 1: if (onNewFolder) onNewFolder(); break;
+                case 2:
+                    searchActive = ! searchActive;
+                    searchBox.setVisible (searchActive);
+                    if (! searchActive) { searchBox.setText ({}, false); filter = {}; }
+                    if (onHeightChanged) onHeightChanged();
+                    resized();
+                    rebuild();
+                    if (searchActive) searchBox.grabKeyboardFocus();
+                    break;
+                case 3: if (onOpenFolder) onOpenFolder(); break;
+                case 4: favOnly = ! favOnly; rebuild(); if (onHeightChanged) onHeightChanged(); break;
+                default: break;
+            }
+            break;
         default: break;
     }
 }
