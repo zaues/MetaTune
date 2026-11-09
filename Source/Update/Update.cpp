@@ -105,6 +105,9 @@ static juce::PropertiesFile& props()
 bool Settings::autoCheck() { return props().getBoolValue ("autoCheck", true); }
 void Settings::setAutoCheck (bool on) { props().setValue ("autoCheck", on); props().saveIfNeeded(); }
 
+juce::String Settings::notesVersion() { return props().getValue ("notesVersion"); }
+void Settings::setNotesVersion (const juce::String& v) { props().setValue ("notesVersion", v); props().saveIfNeeded(); }
+
 std::optional<Release> Settings::cached()
 {
     Release r { props().getValue ("latestVersion"), props().getValue ("latestUrl"), props().getValue ("latestSha256") };

@@ -47,6 +47,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
         if (id == 601) startUpdateCheck();
         if (id == 602) installUpdate();
         if (id == 603) proc.ui.keepScale = ! proc.ui.keepScale;
+        if (id == 604) showNotesCard();
     };
     settingsPanel.onMouseLeave = [this] {
         if (! settingsPanel.getLocalBounds().contains (settingsPanel.getMouseXYRelative()))
@@ -55,6 +56,10 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     canvas.addChildComponent (saveCard);
     saveCard.setBounds (0, 0, kW, kH);
     saveCard.onCancel = [this] { saveCard.setVisible (false); };
+    canvas.addChildComponent (notesCard);
+    notesCard.setBounds (0, 0, kW, kH);
+    if (update::Settings::notesVersion() != JucePlugin_VersionString)
+        showNotesPending = true; // a version change (install/update): show "What's New" once the UI is laid out
     saveCard.onSave = [this] (const juce::String& n) {
         if (pendingSave == PendingSave::GroupName)
         {
@@ -543,6 +548,11 @@ void MetaTuneEditor::timerCallback()
         if (std::abs (getWidth() - juce::roundToInt (kW * openScale)) > 2)
             setSize (juce::roundToInt (kW * openScale), juce::roundToInt (kH * openScale));
     }
+    if (showNotesPending && sizeRestored)
+    {
+        showNotesPending = false;
+        showNotesCard();
+    }
     // While bypassed nothing is corrected: show output = input and no target.
     const bool bypassed = state.getRawParameterValue (ParamID::bypass)->load() > 0.5f;
     metatune::Telemetry t;
@@ -811,6 +821,7 @@ void MetaTuneEditor::showSettingsPanel (bool show)
             items.push_back ({ Item::Kind::Choice, "Check automatically", {}, 600, update::Settings::autoCheck() });
         }
         items.push_back ({ Item::Kind::Header, {} });
+        items.push_back ({ Item::Kind::Choice, "Release notes", {}, 604, false });
         items.push_back ({ Item::Kind::Info, juce::String (JucePlugin_Name) + " " + JucePlugin_VersionString });
         settingsPanel.setItems (std::move (items));
     }
@@ -914,6 +925,27 @@ void MetaTuneEditor::refreshGroupBrowser()
                           inf.preset.isNotEmpty() ? inf.preset : "Instance " + juce::String (inf.id),
                           inf.id == proc.instanceId });
     groupBrowser.setData (names, rows);
+}
+
+void MetaTuneEditor::showNotesCard()
+{
+    update::Settings::setNotesVersion (JucePlugin_VersionString);
+    showPresetPanel (false);
+    showSettingsPanel (false);
+    showGroupBrowser (false);
+    notesCard.setVisible (false); // keep the overlay out of its own backdrop snapshot
+    auto snap = canvas.createComponentSnapshot (canvas.getLocalBounds());
+    if (snap.isValid())
+    {
+        auto small = snap.rescaled (juce::jmax (1, snap.getWidth() / 3), juce::jmax (1, snap.getHeight() / 3));
+        juce::ImageConvolutionKernel blur (9);
+        blur.createGaussianBlur (3.0f);
+        blur.applyToImage (small, small, small.getBounds());
+        notesCard.open (small);
+    }
+    else
+        notesCard.open ({});
+    notesCard.toFront (false);
 }
 
 void MetaTuneEditor::showGroupBrowser (bool show)

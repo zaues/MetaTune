@@ -308,6 +308,29 @@ private:
     juce::String message;
 };
 
+// Full-window "What's New" / release-notes overlay: blurs the UI behind it and shows a scrollable
+// list of version notes in a centred card with a close (X) button.
+class ReleaseNotesCard : public juce::Component
+{
+public:
+    ReleaseNotesCard() { setInterceptsMouseClicks (true, true); }
+    std::function<void()> onClose;
+    void open (juce::Image blurredBackdrop);
+    void paint (juce::Graphics&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+
+private:
+    juce::Rectangle<int> cardBounds() const;
+    juce::Rectangle<float> closeBounds() const;
+    void buildLayouts (float width);
+    float contentHeight() const;
+
+    juce::Image backdrop;
+    float scroll = 0, lastWidth = 0;
+    std::vector<juce::TextLayout> bodyLayouts;
+};
+
 // Settings list that drops down from the header menu button, styled like the preset panel:
 // section headers, choices with a hover box and a dot on the current one, and dim info lines.
 class SettingsPanel : public juce::Component

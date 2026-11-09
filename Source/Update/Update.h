@@ -38,6 +38,9 @@ struct Settings
     static std::optional<Release> cached();
     static void store (const std::optional<Release>&);
     static bool checkDue(); // more than 6 hours since the last check
+    // The plugin version whose "What's New" notes were last shown (global, so it pops up once per update).
+    static juce::String notesVersion();
+    static void setNotesVersion (const juce::String&);
 };
 
 // Copies the updater to %TEMP% (the installer replaces the original while it runs) and starts it

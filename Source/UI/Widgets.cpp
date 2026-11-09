@@ -1,4 +1,5 @@
 #include "Widgets.h"
+#include "../ReleaseNotes.h"
 
 namespace icons
 {
@@ -1125,4 +1126,121 @@ void SettingsPanel::mouseUp (const juce::MouseEvent& e)
 {
     const int i = rowAt (e.position);
     if (i >= 0 && onPick) onPick (items[size_t (i)].id);
+}
+
+// ---- ReleaseNotesCard
+
+void ReleaseNotesCard::open (juce::Image blurredBackdrop)
+{
+    backdrop = blurredBackdrop;
+    scroll = 0;
+    lastWidth = 0; // force the layouts to rebuild for the current width
+    setVisible (true);
+    toFront (false);
+    repaint();
+}
+
+juce::Rectangle<int> ReleaseNotesCard::cardBounds() const
+{
+    const int w = juce::jmin (540, getWidth() - 60);
+    const int h = juce::jmin (getHeight() - 70, 600);
+    return juce::Rectangle<int> (w, h).withCentre (getLocalBounds().getCentre());
+}
+
+juce::Rectangle<float> ReleaseNotesCard::closeBounds() const
+{
+    const auto c = cardBounds();
+    return { float (c.getRight() - 42), float (c.getY() + 14), 26.0f, 26.0f };
+}
+
+void ReleaseNotesCard::buildLayouts (float width)
+{
+    using namespace theme;
+    bodyLayouts.clear();
+    for (int i = 0; i < kNumReleaseNotes; ++i)
+    {
+        juce::AttributedString as;
+        as.append (juce::String::fromUTF8 (kReleaseNotes[i].body), font (13.0f), textDim);
+        as.setLineSpacing (3.0f);
+        juce::TextLayout tl;
+        tl.createLayout (as, width);
+        bodyLayouts.push_back (std::move (tl));
+    }
+    lastWidth = width;
+}
+
+float ReleaseNotesCard::contentHeight() const
+{
+    float h = 0.0f;
+    for (const auto& tl : bodyLayouts) h += 26.0f + tl.getHeight() + 18.0f;
+    return h;
+}
+
+void ReleaseNotesCard::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    if (backdrop.isValid())
+        g.drawImage (backdrop, getLocalBounds().toFloat(), juce::RectanglePlacement::stretchToFit);
+    g.fillAll (juce::Colours::black.withAlpha (0.5f));
+
+    const auto cb = cardBounds();
+    const auto cf = cb.toFloat();
+    juce::DropShadow (juce::Colours::black.withAlpha (0.7f), 28, { 0, 10 }).drawForRectangle (g, cb);
+    g.setColour (bg2);
+    g.fillRoundedRectangle (cf, 12.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.08f));
+    g.drawRoundedRectangle (cf.reduced (0.5f), 12.0f, 1.0f);
+
+    g.setFont (font (20.0f, true));
+    shadowText (g, "What's New", juce::Rectangle<float> (cf.getX() + 22.0f, cf.getY() + 15.0f, cf.getWidth() - 90.0f, 28.0f),
+                juce::Justification::centredLeft, text);
+
+    // Close (X).
+    const auto xb = closeBounds();
+    const bool xHot = xb.contains (getMouseXYRelative().toFloat());
+    if (xHot) { g.setColour (juce::Colours::white.withAlpha (0.12f)); g.fillRoundedRectangle (xb, 6.0f); }
+    g.setColour (text.withAlpha (xHot ? 1.0f : 0.7f));
+    const auto xi = xb.reduced (8.0f);
+    g.drawLine (xi.getX(), xi.getY(), xi.getRight(), xi.getBottom(), 1.8f);
+    g.drawLine (xi.getX(), xi.getBottom(), xi.getRight(), xi.getY(), 1.8f);
+
+    const float top = cf.getY() + 52.0f;
+    g.setColour (juce::Colours::white.withAlpha (0.08f));
+    g.fillRect (cf.getX() + 16.0f, top, cf.getWidth() - 32.0f, 1.0f);
+
+    const float padX = 24.0f, width = cf.getWidth() - padX * 2.0f;
+    if (std::abs (lastWidth - width) > 0.5f) buildLayouts (width);
+    const juce::Rectangle<float> content (cf.getX() + padX, top + 12.0f, width, cf.getBottom() - top - 24.0f);
+    juce::Graphics::ScopedSaveState ss (g);
+    g.reduceClipRegion (content.toNearestInt());
+    float y = content.getY() - scroll;
+    for (int i = 0; i < kNumReleaseNotes; ++i)
+    {
+        g.setFont (font (15.0f, true));
+        shadowText (g, "Version " + juce::String (kReleaseNotes[i].version),
+                    juce::Rectangle<float> (content.getX(), y, width, 22.0f), juce::Justification::centredLeft, violet.brighter (0.3f));
+        y += 26.0f;
+        bodyLayouts[size_t (i)].draw (g, juce::Rectangle<float> (content.getX(), y, width, bodyLayouts[size_t (i)].getHeight()));
+        y += bodyLayouts[size_t (i)].getHeight() + 10.0f;
+        g.setColour (juce::Colours::white.withAlpha (0.05f));
+        g.fillRect (content.getX(), y, width, 1.0f);
+        y += 8.0f;
+    }
+}
+
+void ReleaseNotesCard::mouseUp (const juce::MouseEvent& e)
+{
+    if (closeBounds().contains (e.position) || ! cardBounds().contains (e.getPosition()))
+    {
+        setVisible (false);
+        if (onClose) onClose();
+    }
+}
+
+void ReleaseNotesCard::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
+{
+    if (! cardBounds().contains (e.getPosition())) return;
+    const float maxS = juce::jmax (0.0f, contentHeight() - (cardBounds().toFloat().getHeight() - 76.0f));
+    scroll = juce::jlimit (0.0f, maxS, scroll - w.deltaY * 120.0f);
+    repaint();
 }

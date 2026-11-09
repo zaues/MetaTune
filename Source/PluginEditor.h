@@ -45,6 +45,7 @@ private:
     void refreshPresetPanel();
     void showGroupBrowser (bool show);
     void refreshGroupBrowser();
+    void showNotesCard(); // "What's New" overlay
     void showSettingsPanel (bool show);
     void stepPreset (int delta);
     void savePresetDialog();
@@ -75,6 +76,7 @@ private:
     GroupBrowser groupBrowser;
     SettingsPanel settingsPanel;
     SavePresetCard saveCard;
+    ReleaseNotesCard notesCard;
 
     TextPill notePill { "Note", TextPill::Kind::Primary };
     TextPill majorPill { "Major", TextPill::Kind::Plain }, minorPill { "Minor", TextPill::Kind::Plain };
@@ -113,6 +115,7 @@ private:
     double openedMs = juce::Time::getMillisecondCounterHiRes();
     float openScale = proc.ui.scale; // saved size at open; the host's first resize must not replace it
     bool sizeRestored = false;
+    bool showNotesPending = false; // show the "What's New" overlay once, after the UI is first laid out
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MetaTuneEditor)
 };
