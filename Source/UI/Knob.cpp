@@ -42,18 +42,35 @@ bool Knob::hitTest (int x, int y)
     return speedOutline().contains (p.transformedBy (speedTransform (b.getCentre(), radius).inverted()));
 }
 
+void Knob::setSustainDisplay (float amount, float timeRatio)
+{
+    if (amount == sustainAmount && std::abs (timeRatio - sustainTimeRatio) < 0.001f)
+        return;
+
+    sustainAmount = amount;
+    sustainTimeRatio = timeRatio;
+    repaint();
+}
+
 void Knob::paint (juce::Graphics& g)
 {
     using namespace theme;
     const auto bounds = getLocalBounds().toFloat();
     const float R = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.5f - 1.0f;
     const auto c = bounds.getCentre();
-    const float t = float (valueToProportionOfLength (getValue()));
+    const double setting = getValue();
+    const bool speed = style.bandFrom >= 0.0f;
+    const double displayedValue = speed && setting > 0.0 && ! isMouseButtonDown()
+        ? setting * sustainTimeRatio : setting;
+    const float t = float (valueToProportionOfLength (displayedValue));
+    const auto bypassColour = [this] (juce::Colour normal, juce::Colour warm)
+    {
+        return normal.interpolatedWith (warm.withAlpha (normal.getFloatAlpha()), bypassBlend);
+    };
     const float hv = hover;
     const bool hot = hv > 0.5f || hasKeyboardFocus (false);
 
     juce::Graphics::ScopedSaveState ss (g);
-    const bool speed = style.bandFrom >= 0.0f;
     juce::Path housing;
     if (speed)
     {
@@ -110,6 +127,34 @@ void Knob::paint (juce::Graphics& g)
             if (p <= tickEnd) return std::lerp (a0, crest, p / tickEnd);
             return std::lerp (crest, a1, (p - tickEnd) / (1.0f - tickEnd));
         };
+        if (speed && setting > 0.0 && std::abs (sustainAmount) > 0.002f)
+        {
+            const float start = angleAt (float (valueToProportionOfLength (setting)));
+            const float end = juce::jlimit (a0, a1, start + rad (108.0f) * sustainAmount);
+            const float radius = R * 0.969f;
+            const auto ink = bypassColour (tint (juce::Colour (0xffad96e6), meterHue), bypassAccent);
+            const float response = juce::jlimit (0.0f, 1.0f,
+                std::abs (1.0f - sustainTimeRatio) / (0.97f * std::abs (sustainAmount)));
+            juce::Path gauge;
+            gauge.addCentredArc (c.x, c.y, radius, radius, 0.0f, juce::jmin (start, end), juce::jmax (start, end), true);
+            const juce::PathStrokeType soft (R * 0.034f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+            const juce::PathStrokeType fine (R * 0.015f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+            g.setColour (ink.withAlpha (0.15f));
+            g.strokePath (gauge, soft);
+            g.setColour (ink.withAlpha (0.67f));
+            g.strokePath (gauge, fine);
+            if (response > 0.01f)
+            {
+                const float movingEnd = std::lerp (start, end, response);
+                juce::Path activeGauge;
+                activeGauge.addCentredArc (c.x, c.y, radius, radius, 0.0f,
+                                           juce::jmin (start, movingEnd), juce::jmax (start, movingEnd), true);
+                g.setColour (ink.withAlpha (0.16f));
+                g.strokePath (activeGauge, soft);
+                g.setColour (ink.interpolatedWith (juce::Colours::white, 0.43f).withAlpha (0.61f));
+                g.strokePath (activeGauge, fine);
+            }
+        }
         const int n = speed ? 102 : 127;
         {
             // Glow under the lit ticks (the "box-shadow" of the arc).
@@ -118,7 +163,8 @@ void Knob::paint (juce::Graphics& g)
             {
                 juce::Path glowArc;
                 glowArc.addCentredArc (c.x, c.y, (r1 + r2) * 0.5f, (r1 + r2) * 0.5f, 0.0f, a0, angleAt (litTo), true);
-                juce::ColourGradient gg (rose.withAlpha (0.16f), c.x - R, c.y + R, lilac.withAlpha (0.18f), c.x + R, c.y - R, false);
+                juce::ColourGradient gg (bypassColour (rose, bypassAccent).withAlpha (0.16f), c.x - R, c.y + R,
+                                         bypassColour (lilac, bypassAccent).withAlpha (0.18f), c.x + R, c.y - R, false);
                 g.setGradientFill (gg);
                 g.strokePath (glowArc, juce::PathStrokeType ((r2 - r1) * 1.42f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
             }
@@ -134,8 +180,9 @@ void Knob::paint (juce::Graphics& g)
             const float u = float (i) / float (n - 1), p = u * tickEnd;
             const float a = angleAt (p);
             const juce::Point<float> dir (std::sin (a), -std::cos (a));
-            const auto base = gradientOn ? tint (rose.interpolatedWith (lilac, u).interpolatedWith (juce::Colours::white, 0.45f * u * u), meterHue)
-                                         : tickPalette.getColourAtPosition (u);
+            const auto active = gradientOn ? tint (rose.interpolatedWith (lilac, u).interpolatedWith (juce::Colours::white, 0.45f * u * u), meterHue)
+                                           : tickPalette.getColourAtPosition (u);
+            const auto base = bypassColour (active, juce::Colour (0xffa4474f).interpolatedWith (bypassAccent, u));
             const bool lit = p <= t + 1e-4f;
             g.setColour (lit ? base.brighter (0.12f * hv) : base.withAlpha (0.17f + 0.11f * hv));
             const float inner = r1 + (speed ? 0.0f : R * 0.021f * u);
@@ -158,12 +205,15 @@ void Knob::paint (juce::Graphics& g)
                 lit.addCentredArc (c.x, c.y, rm, rm, 0.0f, ab, angleAt (t), true);
                 const juce::Point<float> pa (c.x + rm * std::sin (ab), c.y - rm * std::cos (ab));
                 const juce::Point<float> pb (c.x + rm * std::sin (a1), c.y - rm * std::cos (a1));
-                juce::ColourGradient grad (tickColour (0xff41c1ff), pa, tickColour (0xffffcfda), pb, false);
-                grad.addColour (0.26, tickColour (0xffa684ff));
-                grad.addColour (0.56, tickColour (0xfffa64f2));
+                juce::ColourGradient grad (bypassColour (tickColour (0xff41c1ff), juce::Colour (0xffb7595d)), pa,
+                                           bypassColour (tickColour (0xffffcfda), juce::Colour (0xffffc2bb)), pb, false);
+                grad.addColour (0.26, bypassColour (tickColour (0xffa684ff), bypassAccent));
+                grad.addColour (0.56, bypassColour (tickColour (0xfffa64f2), juce::Colour (0xffee8987)));
                 if (activity > 0.01f) // soft halo under the band while singing
                 {
-                    juce::ColourGradient glow (cyan.withAlpha (0.18f * activity), pa, pink.withAlpha (0.18f * activity), pb, false);
+                    const auto glowAlpha = 0.18f * activity;
+                    juce::ColourGradient glow (bypassColour (cyan, bypassAccent).withAlpha (glowAlpha), pa,
+                                               bypassColour (pink, bypassAccent).withAlpha (glowAlpha), pb, false);
                     g.setGradientFill (glow);
                     g.strokePath (lit, juce::PathStrokeType (bw * (1.0f + 0.18f * activity), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
                 }
@@ -193,7 +243,7 @@ void Knob::paint (juce::Graphics& g)
     if (style.smoothArc)
     {
         // Slim, smooth progress arc (bipolar: fills out from the 12-o'clock centre both ways).
-        const float rm = R * 0.825f, bw = juce::jmax (2.5f, R * 0.060f);
+        const float rm = R * 0.822f, bw = juce::jmax (2.3f, R * 0.054f);
         const float a0 = rad (style.startDeg), a1 = rad (style.endDeg);
         auto ang = [&] (float p) { return a0 + (a1 - a0) * p; };
         juce::Path track;
@@ -207,20 +257,17 @@ void Knob::paint (juce::Graphics& g)
             const float lo = juce::jmin (base, t), hi = juce::jmax (base, t);
             juce::Path lit;
             lit.addCentredArc (c.x, c.y, rm, rm, 0.0f, ang (lo), ang (hi), true);
-            const juce::Point<float> pa (c.x - R, c.y), pb (c.x + R, c.y);
-            juce::ColourGradient grad (lavender, pa, violet.brighter (0.1f), pb, false);
-            grad.addColour (0.5, lilac.interpolatedWith (violet, 0.4f));
-            if (activity > 0.01f)
+            const auto pointAt = [&] (float proportion)
             {
-                g.setColour (violet.withAlpha (0.35f * activity));
-                g.strokePath (lit, juce::PathStrokeType (bw * (1.0f + 1.2f * activity), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-            }
-            g.setGradientFill (grad);
-            g.strokePath (lit, juce::PathStrokeType (bw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-            const float at = ang (t);
-            const juce::Point<float> mp (c.x + rm * std::sin (at), c.y - rm * std::cos (at));
-            g.setColour (juce::Colours::white);
-            g.fillEllipse (mp.x - bw * 0.52f, mp.y - bw * 0.52f, bw * 1.04f, bw * 1.04f);
+                const float angle = ang (proportion);
+                return c.translated (rm * std::sin (angle), -rm * std::cos (angle));
+            };
+            const auto ink = bypassColour (tint (juce::Colour (0xffb59bed), meterHue), bypassAccent);
+            g.setColour (ink.withAlpha (0.19f));
+            g.strokePath (lit, juce::PathStrokeType (bw * 1.47f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            g.setGradientFill (juce::ColourGradient (ink.withAlpha (0.88f), pointAt (base),
+                                                     ink.withAlpha (0.48f), pointAt (t), false));
+            g.strokePath (lit, juce::PathStrokeType (bw * 0.66f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
     }
 
@@ -235,7 +282,7 @@ void Knob::paint (juce::Graphics& g)
     const float lcdH = R * (speed ? 0.226f : (sustain ? 0.234f : 0.242f));
     const float lcdY = c.y - R * (speed ? 0.226f : (sustain ? 0.307f : 0.275f));
     const float lcdShift = R * (speed ? -0.021f : (sustain ? 0.014f : -0.033f));
-    const auto readout = format (getValue());
+    const auto readout = format (displayedValue);
     const juce::Rectangle<float> display (c.x - ri + lcdShift, lcdY, 2 * ri, lcdH);
     drawSevenSeg (g, readout, display.translated (0.0f, 0.9f), style.cells,
                   juce::Colours::black.withAlpha (0.46f), juce::Colours::transparentBlack, true);
@@ -244,7 +291,7 @@ void Knob::paint (juce::Graphics& g)
                   digit.interpolatedWith (lavender.interpolatedWith (violet, 0.35f), turning.get()), juce::Colours::transparentBlack, true);
     g.setFont (font (sustain ? 16.0f : 17.0f));
     const float labelY = lcdY + lcdH + R * (speed ? 0.054f : (sustain ? 0.136f : 0.081f));
-    shadowText (g, hot && style.unit.isNotEmpty() ? style.unit : label,
+    shadowText (g, (hv > 0.5f || isMouseButtonDown()) && style.unit.isNotEmpty() ? style.unit : label,
                 juce::Rectangle<float> (c.x - ri + style.labelDx * R, labelY, 2 * ri, R * 0.16f),
                 juce::Justification::centred, text.withAlpha (0.96f), 0.8f, 0.46f);
 }

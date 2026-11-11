@@ -31,6 +31,7 @@ private:
     };
 
     void timerCallback() override;
+    void updateBypassAppearance (bool bypassed, double now);
     void mouseDown (const juce::MouseEvent&) override; // global listener: a click outside the key picker closes it
     void layout();
     void keyClicked (int pc);
@@ -39,6 +40,11 @@ private:
     void setParam (const juce::String& id, float value);
     void selectScale (metatune::ScaleType);
     void selectNoteMode();
+    int pianoMode() const;
+    void setPianoMode (int mode, bool hold = false);
+    void finishPianoChoice();
+    void toggleChromatic();
+    std::optional<metatune::PitchClassMask> pickerPreview (juce::Point<float>) const;
     void updatePicker();        // per-frame: eases the picker's slide toward the pointer/pin state
     void syncRootPickerState(); // push current root/scale into the picker
     void applyPickedScale (int index); // RootPicker::scaleNames() index
@@ -89,8 +95,10 @@ private:
     AutoKeyCard autoKeyCard;
 
     TextPill notePill { "Note", TextPill::Kind::Primary };
-    TextPill majorPill { "Major", TextPill::Kind::SplitLeft }, minorPill { "Minor", TextPill::Kind::SplitLeft };
-    TextPill majorHoldPill { "Hold", TextPill::Kind::SplitRight }, minorHoldPill { "Hold", TextPill::Kind::SplitRight };
+    TextPill majorPill { "Major", TextPill::Kind::SplitLeft, theme::majorAudition };
+    TextPill minorPill { "Minor", TextPill::Kind::SplitLeft, theme::minorAudition };
+    TextPill majorHoldPill { "Hold", TextPill::Kind::SplitRight, theme::majorAudition };
+    TextPill minorHoldPill { "Hold", TextPill::Kind::SplitRight, theme::minorAudition };
     ToggleSwitch lowLatency;
 
     IconButton colorButton { "color", icons::palette() };
@@ -100,8 +108,10 @@ private:
     PillButton aButton { "A" }, bButton { "B" };
     IconButton copyButton { "copy", icons::copyArrow() };
     IconButton helpButton { "tips", icons::chat() };
-    IconButton heatButton { "heat", icons::eye(), "In/Out\nHeatMaps", icons::swap() };
-    IconButton detectedButton { "detected", icons::eye(), "Detected\nNotes", icons::swap() };
+    IconButton heatButton { "heat", icons::eye(), "In/Out\nHeatMaps" };
+    IconButton detectedButton { "detected", icons::eye(), "Detected\nNotes" };
+    IconButton heatResetButton { "Reset Heat Maps", icons::swap() };
+    IconButton detectedResetButton { "Reset Detected Notes", icons::swap() };
     IconButton bypassButton { "bypass", icons::power(), "Global\nBypass" };
     IconButton chromaticButton { "chromatic", icons::swap(), "Chromatic" };
     UpdatePill updatePill;
@@ -111,18 +121,20 @@ private:
     juce::Rectangle<int> rootArea;
     bool pickerPinned = false; // true = picker opened by clicking "Scale"; stays until a click elsewhere
     float pickerSlide = 0.0f;  // 0 = tucked off the left edge / hidden, 1 = fully in; eased each frame
-    int toneChordMode = 0;     // 0 single, 1 major, 2 minor: what the tone generator plays on a key press
-    enum class PendingSave { Preset, Folder, GroupName } pendingSave = PendingSave::Preset;
+    int toneChordMode = 0; // 0 Note, 1 Major, 2 Minor
+    enum class PendingSave { Preset, Folder } pendingSave = PendingSave::Preset;
     juce::String pendingFolder; // target folder for the next preset save ("" = root)
-    int pendingGroup = 0;       // group being renamed via the save card
     std::unique_ptr<juce::TooltipWindow> tooltipWindow;
 
     DisplayState display;
     double lastVoicedMs = -1e9;
     float latestRms = 0;
+    float latestSustainRatio = 1.0f;
     int shownRange = -1;
     int presetCheckTicks = 0; // throttles the "current preset still exists on disk?" check
-    juce::Image brushed, titleTexture; // Cached chrome textures.
+    juce::Image brushed, titleTexture, bypassTitleTexture; // Cached chrome textures.
+    float bypassBlend = 0.0f;
+    double lastBypassFrameMs = -1.0;
     double openedMs = juce::Time::getMillisecondCounterHiRes();
     float openScale = proc.ui.scale; // saved size at open; the host's first resize must not replace it
     bool sizeRestored = false;

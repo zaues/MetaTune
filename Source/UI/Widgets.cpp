@@ -176,8 +176,8 @@ void TextPill::paintButton (juce::Graphics& g, bool, bool down)
         g.setColour (juce::Colours::black.withAlpha (0.28f));
         g.fillPath (p, juce::AffineTransform::translation (0.0f, 1.35f));
         const auto base = lightMode ? bg3 : dark::control;
-        const auto selected = kind == Kind::SplitLeft ? base.brighter (0.04f * l)
-                                                       : base.interpolatedWith (recolour (dark::notePill), 0.58f * l);
+        const auto accent = selectedAccent.isTransparent() ? recolour (dark::notePill) : selectedAccent;
+        const auto selected = base.interpolatedWith (accent, 0.64f * l);
         g.setGradientFill (juce::ColourGradient (selected.brighter (0.048f), r.getTopLeft(),
                                                  selected.darker (0.22f), r.getBottomLeft(), false));
         g.fillPath (p);
@@ -336,7 +336,8 @@ void GroupTabs::paint (juce::Graphics& g)
         juce::Graphics::ScopedSaveState clip (g);
         g.reduceClipRegion (shell);
         const auto cap = rail.withHeight (float (kTop));
-        g.setGradientFill (juce::ColourGradient (lightMode ? bg3 : dark::railCap, cap.getTopLeft(),
+        const auto capTop = (lightMode ? bg3 : dark::railCap).interpolatedWith (bypassAccent, 0.19f * bypassBlend);
+        g.setGradientFill (juce::ColourGradient (capTop, cap.getTopLeft(),
                                                  lightMode ? menuBg2 : dark::railRow, cap.getBottomLeft(), false));
         g.fillRect (cap);
         if (browseActive)
@@ -344,7 +345,7 @@ void GroupTabs::paint (juce::Graphics& g)
             g.setColour (menuSel);
             g.fillRect (cap.reduced (3.0f));
         }
-        g.setColour (browseActive ? text : textDim);
+        g.setColour ((browseActive ? text : textDim).interpolatedWith (bypassAccent, bypassBlend));
         static const auto grid = icons::grid();
         g.fillPath (grid, grid.getTransformToScaleToFit (juce::Rectangle<float> (19.8f, 19.8f)
                                                           .withCentre ({ 31.0f, 32.0f }), true));
@@ -665,233 +666,303 @@ void RootPicker::paint (juce::Graphics& g)
     }
 }
 
+int RootPicker::rootAt (juce::Point<float> point) const
+{
+    for (int pc = 0; pc < 12; ++pc)
+        if (noteRect (pc).contains (point)) return pc;
+    return -1;
+}
+
+int RootPicker::scaleAt (juce::Point<float> point) const
+{
+    for (int i = 0; i < scaleNames().size() - 1; ++i)
+        if (scaleRect (i).contains (point)) return i;
+    return -1;
+}
+
 void RootPicker::mouseUp (const juce::MouseEvent& e)
 {
     for (int i = 0; i < 2; ++i)
         if (tabRect (i).contains (e.position)) { if (onFlats) onFlats (i == 0); return; }
-    for (int pc = 0; pc < 12; ++pc)
-        if (noteRect (pc).contains (e.position)) { if (onRoot) onRoot (pc); return; }
-    for (int i = 0; i < scaleNames().size() - 1; ++i)
-        if (scaleRect (i).contains (e.position)) { if (onScale) onScale (i); return; } // stays open; hovering out closes it
+    if (const int pc = rootAt (e.position); pc >= 0) { if (onRoot) onRoot (pc); return; }
+    if (const int i = scaleAt (e.position); i >= 0 && onScale) onScale (i);
 }
+
+namespace
+{
+const auto browserMuted = juce::Colour (0xff888888);
+const auto browserBright = juce::Colour (0xffe5e5e5);
+const auto browserHover = juce::Colour (0xff333333);
+const auto browserLilac = juce::Colour (0xffaa98ed);
+const auto browserGold = juce::Colour (0xffdfbd8c);
+
+void browserSurface (juce::Graphics& g, juce::Rectangle<float> area, juce::Rectangle<float> panel)
+{
+    if (theme::lightMode)
+    {
+        g.setColour (theme::menuBg);
+        g.fillRect (area);
+        return;
+    }
+
+    // The translucent sheet follows the stage lighting and becomes fainter down and to the right.
+    const juce::Point<float> slope { 0.039f / juce::jmax (1.0f, panel.getWidth()),
+                                     0.029f / juce::jmax (1.0f, panel.getHeight()) };
+    const auto end = panel.getTopLeft() + slope * (0.068f / slope.getDistanceSquaredFromOrigin());
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.092f), panel.getTopLeft(),
+                                             juce::Colours::white.withAlpha (0.024f), end, false));
+    g.fillRect (area);
+}
+
+void browserDrawerBody (juce::Graphics& g, juce::Rectangle<float> bounds)
+{
+    if (theme::lightMode)
+    {
+        g.setColour (theme::menuBg);
+        g.fillRect (bounds);
+        return;
+    }
+
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff505050), bounds.getTopLeft(),
+                                             juce::Colour (0xff2d2d2d), bounds.getTopRight(), false));
+    g.fillRect (bounds);
+
+    // Reproduce the stage illumination inside the opaque drawer; the orb is occluded by the sheet.
+    juce::ColourGradient shade (juce::Colours::transparentBlack, bounds.getTopLeft(),
+                                juce::Colours::black.withAlpha (0.46f), bounds.getBottomLeft(), false);
+    shade.addColour (0.12, juce::Colours::black.withAlpha (0.11f));
+    shade.addColour (0.25, juce::Colours::black.withAlpha (0.25f));
+    shade.addColour (0.45, juce::Colours::black.withAlpha (0.40f));
+    shade.addColour (0.65, juce::Colours::black.withAlpha (0.46f));
+    shade.addColour (0.83, juce::Colours::black.withAlpha (0.47f));
+    shade.addColour (0.96, juce::Colours::black.withAlpha (0.44f));
+    g.setGradientFill (shade);
+    g.fillRect (bounds);
+}
+
+void browserLabel (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> r,
+                   juce::Colour colour, bool bold = false, bool italic = false)
+{
+    auto font = theme::font (13.1f, bold);
+    if (italic) font = font.italicised();
+    g.setFont (font);
+    g.setColour (theme::lightMode ? theme::text : colour);
+    g.drawText (text, r, juce::Justification::centredLeft, true);
+}
+
+void browserFolder (juce::Graphics& g, juce::Point<float> c, juce::Colour colour)
+{
+    juce::Path p;
+    p.startNewSubPath (c.x - 6.5f, c.y + 4.8f);
+    p.lineTo (c.x - 6.5f, c.y - 5.1f);
+    p.lineTo (c.x - 1.7f, c.y - 5.1f);
+    p.lineTo (c.x + 0.3f, c.y - 3.1f);
+    p.lineTo (c.x + 6.5f, c.y - 3.1f);
+    p.lineTo (c.x + 6.5f, c.y + 4.8f);
+    p.closeSubPath();
+    p.startNewSubPath (c.x - 6.5f, c.y - 1.0f);
+    p.lineTo (c.x + 6.5f, c.y - 1.0f);
+    g.setColour (colour);
+    g.strokePath (p, juce::PathStrokeType (1.1f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
+
+void browserPlus (juce::Graphics& g, juce::Point<float> c, juce::Colour colour)
+{
+    g.setColour (colour);
+    g.drawLine (c.x - 3.5f, c.y, c.x + 3.5f, c.y, 1.3f);
+    g.drawLine (c.x, c.y - 3.5f, c.x, c.y + 3.5f, 1.3f);
+}
+
+void browserChevron (juce::Graphics& g, juce::Point<float> c, bool open)
+{
+    g.setColour (browserMuted);
+    juce::Path p;
+    if (open)
+    {
+        p.startNewSubPath (c.x - 2.6f, c.y - 1.2f);
+        p.lineTo (c.x, c.y + 1.5f);
+        p.lineTo (c.x + 2.6f, c.y - 1.2f);
+    }
+    else
+    {
+        p.startNewSubPath (c.x - 1.2f, c.y - 2.7f);
+        p.lineTo (c.x + 1.5f, c.y);
+        p.lineTo (c.x - 1.2f, c.y + 2.7f);
+    }
+    g.strokePath (p, juce::PathStrokeType (1.05f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
+
+void browserTrash (juce::Graphics& g, juce::Rectangle<float> r)
+{
+    const auto c = r.getCentre();
+    g.setColour (browserMuted);
+    g.drawRoundedRectangle (c.x - 2.9f, c.y - 2.9f, 5.8f, 7.1f, 1.15f, 1.0f);
+    g.drawLine (c.x - 4.0f, c.y - 3.5f, c.x + 4.0f, c.y - 3.5f, 1.1f);
+    g.drawLine (c.x - 1.5f, c.y - 5.0f, c.x + 1.5f, c.y - 5.0f, 1.1f);
+}
+
+void drawStar (juce::Graphics& g, juce::Rectangle<float> b, bool filled, juce::Colour colour)
+{
+    juce::Path star;
+    star.addStar (b.getCentre(), 5, b.getWidth() * 0.21f, b.getWidth() * 0.5f);
+    g.setColour (colour);
+    if (filled) g.fillPath (star);
+    else g.strokePath (star, juce::PathStrokeType (1.1f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+}
+} // namespace
 
 PresetPanel::PresetPanel()
 {
     addChildComponent (searchBox);
-    searchBox.setTextToShowWhenEmpty ("Search presets", theme::textDim);
+    searchBox.setTextToShowWhenEmpty ("Search presets", browserMuted);
     searchBox.setColour (juce::TextEditor::backgroundColourId, theme::well);
-    searchBox.setColour (juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha (0.12f));
-    searchBox.setColour (juce::TextEditor::focusedOutlineColourId, theme::violet.withAlpha (0.7f));
-    searchBox.setColour (juce::TextEditor::textColourId, theme::text);
-    searchBox.setColour (juce::TextEditor::highlightColourId, theme::violet.withAlpha (0.35f));
+    searchBox.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+    searchBox.setColour (juce::TextEditor::focusedOutlineColourId, browserLilac);
+    searchBox.setColour (juce::TextEditor::textColourId, browserBright);
     searchBox.setFont (theme::font (13.0f));
-    searchBox.setJustification (juce::Justification::centredLeft);
     searchBox.onTextChange = [this] { filter = searchBox.getText().trim(); rebuild(); };
-    searchBox.onEscapeKey  = [this] { searchBox.setText ({}, false); filter = {}; searchActive = false;
-                                      searchBox.setVisible (false); rebuild(); repaint(); };
+    searchBox.onEscapeKey = [this]
+    {
+        searchBox.setText ({}, false);
+        filter = {};
+        searchActive = false;
+        searchBox.setVisible (false);
+        rebuild();
+    };
 }
 
 void PresetPanel::resized()
 {
-    searchBox.setBounds (10, 6, juce::jmax (0, getWidth() - 20), 24);
+    searchBox.setBounds (8, 3, juce::jmax (0, getWidth() - 16), 24);
 }
 
-void PresetPanel::setItems (const std::vector<PresetItem>& items, const juce::String& cur)
+void PresetPanel::setModeOptions (bool keep, bool low, bool stabilizing)
+{
+    if (keep == keepScale && low == lowLatency && stabilizing == stabilizer) return;
+    keepScale = keep;
+    lowLatency = low;
+    stabilizer = stabilizing;
+    repaint();
+}
+
+void PresetPanel::setItems (const std::vector<PresetItem>& items, const juce::StringArray& folders, const juce::String& selected)
 {
     allItems = items;
-    current = cur;
+    userFolders = folders;
+    current = selected;
     rebuild();
+}
+
+float PresetPanel::rowHeight (Kind kind)
+{
+    if (kind == Kind::Timing) return 31.0f;
+    if (kind == Kind::Divider) return 10.0f;
+    return kRowH;
 }
 
 void PresetPanel::rebuild()
 {
-    rows.clear();
-    const int n = int (allItems.size());
-    const auto match = [this] (const PresetItem& it)
+    rows = { { Kind::KeepScale, "Keep My Scale", {} }, { Kind::Timing, {}, {} },
+             { Kind::NewPreset, "New preset...", {} }, { Kind::NewFolder, "New folder...", {} },
+             { Kind::Divider, {}, {} } };
+    const auto matches = [this] (const PresetItem& item)
     {
-        if (favOnly && ! it.favorite) return false;
-        if (filter.isNotEmpty() && ! it.name.containsIgnoreCase (filter)) return false;
-        return true;
+        return (! favOnly || item.favorite) && (filter.isEmpty() || item.name.containsIgnoreCase (filter));
+    };
+    const auto addPresets = [&] (const juce::String& folder)
+    {
+        for (int i = 0; i < int (allItems.size()); ++i)
+        {
+            const auto& item = allItems[size_t (i)];
+            if (item.folder == folder && matches (item))
+                rows.push_back ({ Kind::Preset, item.name, folder, i, item.factory, item.favorite });
+        }
     };
 
-    int idx = 0;
-    bool facHeader = false;
-    for (; idx < n && allItems[size_t (idx)].factory; ++idx)
+    juce::StringArray folders;
+    for (const auto& item : allItems)
+        if (item.factory && item.folder.isNotEmpty()) folders.addIfNotAlreadyThere (item.folder);
+    folders.sortNatural();
+    folders.addArray (userFolders);
+    folders.removeDuplicates (false);
+    const bool searching = favOnly || filter.isNotEmpty();
+    bool anyFound = false;
+    for (const auto& folder : folders)
     {
-        const auto& it = allItems[size_t (idx)];
-        if (! match (it)) continue;
-        if (! facHeader) { rows.push_back ({ Kind::Section, "Factory", {}, -1, false, false }); facHeader = true; }
-        rows.push_back ({ Kind::Preset, it.name, {}, idx, true, it.favorite });
+        const bool hasMatch = std::any_of (allItems.begin(), allItems.end(), [&] (const PresetItem& item)
+        {
+            return item.folder == folder && matches (item);
+        });
+        if (searching && ! hasMatch) continue;
+        const bool factoryFolder = std::any_of (allItems.begin(), allItems.end(), [&] (const PresetItem& item)
+        {
+            return item.factory && item.folder == folder;
+        });
+        rows.push_back ({ Kind::Folder, folder, folder, -1, factoryFolder, false });
+        if (searching || openFolders.contains (folder))
+            addPresets (folder);
+        anyFound = anyFound || hasMatch;
     }
 
-    juce::String curFolder; bool folderHeader = false;
-    for (; idx < n && allItems[size_t (idx)].folder.isNotEmpty(); ++idx)
+    const bool hasRootPresets = std::any_of (allItems.begin(), allItems.end(), [&] (const PresetItem& item)
     {
-        const auto& it = allItems[size_t (idx)];
-        if (it.folder != curFolder) { curFolder = it.folder; folderHeader = false; }
-        if (! match (it)) continue;
-        if (! folderHeader) { rows.push_back ({ Kind::Folder, curFolder, curFolder, -1, false, false }); folderHeader = true; }
-        rows.push_back ({ Kind::Preset, it.name, it.folder, idx, false, it.favorite });
-    }
-
-    bool rootHeader = false;
-    for (; idx < n; ++idx)
+        return item.folder.isEmpty() && matches (item);
+    });
+    if (hasRootPresets)
     {
-        const auto& it = allItems[size_t (idx)];
-        if (! match (it)) continue;
-        if (! rootHeader) { rows.push_back ({ Kind::Section, "My presets", {}, -1, false, false }); rootHeader = true; }
-        rows.push_back ({ Kind::Preset, it.name, {}, idx, false, it.favorite });
+        rows.push_back ({ Kind::Section, "My presets", {} });
+        addPresets ({});
     }
-
-    if (rows.empty() && (favOnly || filter.isNotEmpty()))
-        rows.push_back ({ Kind::Section, favOnly ? "No favourites yet" : "No matches", {}, -1, false, false });
-
-    rows.push_back ({ Kind::Section, {}, {}, -1, false, false }); // divider above the toolbar
-    rows.push_back ({ Kind::Toolbar, {}, {}, -1, false, false });
-
+    else if (searching && ! anyFound)
+        rows.push_back ({ Kind::Section, favOnly ? "No favourites yet" : "No matches", {} });
     scroll = juce::jlimit (0.0f, juce::jmax (0.0f, contentHeight() - float (getHeight())), scroll);
     repaint();
 }
 
 float PresetPanel::contentHeight() const
 {
-    float h = 6.0f + topInset();
-    for (const auto& r : rows) h += rowHeight (r);
-    return h + 6.0f;
-}
-
-int PresetPanel::preferredHeight() const { return int (std::ceil (contentHeight())); }
-
-theme::Anim& PresetPanel::rowAnim (int i)
-{
-    while (int (hover.size()) <= i) hover.push_back (std::make_unique<theme::Anim> (*this, 0.3f));
-    return *hover[size_t (i)];
+    float height = topInset();
+    for (const auto& row : rows)
+        height += rowHeight (row.kind);
+    return height;
 }
 
 juce::Rectangle<float> PresetPanel::rowBounds (int i) const
 {
-    float y = 6.0f + topInset() - scroll;
-    for (int j = 0; j < i && j < int (rows.size()); ++j) y += rowHeight (rows[size_t (j)]);
-    const float h = juce::isPositiveAndBelow (i, int (rows.size())) ? rowHeight (rows[size_t (i)]) : kRowH;
-    return { 6.0f, y, float (getWidth()) - 12.0f, h };
+    float y = topInset() - scroll;
+    for (int j = 0; j < i; ++j)
+        y += rowHeight (rows[size_t (j)].kind);
+    return { 0.0f, y, float (getWidth()), rowHeight (rows[size_t (i)].kind) };
 }
 
-juce::Rectangle<float> PresetPanel::trashBounds (juce::Rectangle<float> r) const { return { r.getRight() - 23.0f, r.getCentreY() - 7.0f, 15.0f, 15.0f }; }
-juce::Rectangle<float> PresetPanel::plusBounds (juce::Rectangle<float> r) const { return { r.getRight() - 44.0f, r.getCentreY() - 7.0f, 15.0f, 15.0f }; }
-juce::Rectangle<float> PresetPanel::starBounds (juce::Rectangle<float> r) const { return { r.getRight() - 45.0f, r.getCentreY() - 8.0f, 16.0f, 16.0f }; }
-
-juce::Rectangle<float> PresetPanel::toolBounds (juce::Rectangle<float> r, int i) const
+int PresetPanel::rowAt (juce::Point<float> point) const
 {
-    const float sz = 24.0f, gap = 16.0f, n = 5.0f;
-    const float total = n * sz + (n - 1.0f) * gap;
-    const float x0 = r.getCentreX() - total * 0.5f;
-    return { x0 + float (i) * (sz + gap), r.getCentreY() - sz * 0.5f, sz, sz };
-}
-
-int PresetPanel::toolAt (juce::Rectangle<float> r, juce::Point<float> p) const
-{
-    for (int i = 0; i < 5; ++i) if (toolBounds (r, i).expanded (6.0f).contains (p)) return i;
-    return -1;
-}
-
-int PresetPanel::rowAt (juce::Point<float> p) const
-{
-    float y = 6.0f + topInset() - scroll;
+    if (! getLocalBounds().toFloat().contains (point) || point.y < topInset()) return -1;
+    float y = topInset() - scroll;
     for (int i = 0; i < int (rows.size()); ++i)
     {
-        const float h = rowHeight (rows[size_t (i)]);
-        if (p.y >= y && p.y < y + h) return i;
-        y += h;
+        const float height = rowHeight (rows[size_t (i)].kind);
+        if (point.y >= y && point.y < y + height) return i;
+        y += height;
     }
     return -1;
 }
 
-static void drawTrash (juce::Graphics& g, juce::Rectangle<float> t)
+juce::Rectangle<float> PresetPanel::trashBounds (juce::Rectangle<float> row) const
 {
-    g.setColour (juce::Colour (0xffe06a6a));
-    g.drawRect (t.reduced (3.0f, 1.5f).withTrimmedTop (3.0f), 1.2f);     // can body
-    g.drawLine (t.getX() + 1.0f, t.getY() + 3.0f, t.getRight() - 1.0f, t.getY() + 3.0f, 1.3f); // lid
-    g.drawLine (t.getCentreX() - 1.5f, t.getY() + 1.0f, t.getCentreX() + 1.5f, t.getY() + 1.0f, 1.3f); // handle
+    return { row.getRight() - 28.0f, row.getCentreY() - 8.0f, 16.0f, 16.0f };
 }
 
-static void drawStar (juce::Graphics& g, juce::Rectangle<float> b, bool filled, juce::Colour c)
+juce::Rectangle<float> PresetPanel::plusBounds (juce::Rectangle<float> row) const
 {
-    const auto ctr = b.getCentre();
-    const float ro = b.getWidth() * 0.5f, ri = ro * 0.42f;
-    juce::Path star;
-    for (int i = 0; i < 10; ++i)
-    {
-        const float a = -juce::MathConstants<float>::halfPi + float (i) * (juce::MathConstants<float>::pi / 5.0f);
-        const float rad = (i & 1) ? ri : ro;
-        const juce::Point<float> pt { ctr.x + std::cos (a) * rad, ctr.y + std::sin (a) * rad };
-        if (i == 0) star.startNewSubPath (pt); else star.lineTo (pt);
-    }
-    star.closeSubPath();
-    g.setColour (c);
-    if (filled) g.fillPath (star);
-    else        g.strokePath (star, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-}
-
-// Footer toolbar glyph: 0 new preset, 1 new folder, 2 search, 3 open folder (home), 4 favourites.
-static void drawToolIcon (juce::Graphics& g, juce::Rectangle<float> r, int idx, juce::Colour c, bool active)
-{
-    g.setColour (c);
-    const auto ctr = r.getCentre();
-    switch (idx)
-    {
-        case 0:
-            g.drawLine (ctr.x - 6.0f, ctr.y, ctr.x + 6.0f, ctr.y, 1.8f);
-            g.drawLine (ctr.x, ctr.y - 6.0f, ctr.x, ctr.y + 6.0f, 1.8f);
-            break;
-        case 1:
-        {
-            juce::Path f;
-            f.startNewSubPath (r.getX() + 2.0f, r.getBottom() - 3.0f);
-            f.lineTo (r.getX() + 2.0f, r.getY() + 5.0f);
-            f.lineTo (r.getX() + 8.0f, r.getY() + 5.0f);
-            f.lineTo (r.getX() + 10.0f, r.getY() + 8.0f);
-            f.lineTo (r.getRight() - 2.0f, r.getY() + 8.0f);
-            f.lineTo (r.getRight() - 2.0f, r.getBottom() - 3.0f);
-            f.closeSubPath();
-            g.strokePath (f, juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-            g.drawLine (ctr.x - 3.0f, ctr.y + 3.0f, ctr.x + 3.0f, ctr.y + 3.0f, 1.3f);
-            g.drawLine (ctr.x, ctr.y, ctr.x, ctr.y + 6.0f, 1.3f);
-            break;
-        }
-        case 2:
-            g.drawEllipse (r.getX() + 3.0f, r.getY() + 3.0f, 11.0f, 11.0f, 1.6f);
-            g.drawLine (r.getX() + 13.0f, r.getY() + 13.0f, r.getRight() - 2.0f, r.getBottom() - 2.0f, 1.8f);
-            break;
-        case 3:
-        {
-            juce::Path roof;
-            roof.startNewSubPath (r.getX() + 2.0f, ctr.y);
-            roof.lineTo (ctr.x, r.getY() + 3.0f);
-            roof.lineTo (r.getRight() - 2.0f, ctr.y);
-            g.strokePath (roof, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-            g.drawRect (r.getX() + 4.5f, ctr.y, r.getWidth() - 9.0f, r.getBottom() - ctr.y - 3.0f, 1.3f);
-            break;
-        }
-        case 4:
-            drawStar (g, r.reduced (3.0f), active, c);
-            break;
-        default: break;
-    }
+    return trashBounds (row).translated (-17.0f, 0.0f);
 }
 
 void PresetPanel::paint (juce::Graphics& g)
 {
-    using namespace theme;
-    const auto b = getLocalBounds().toFloat();
-    juce::Path bg;
-    bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), 8.0f, 8.0f, false, false, true, true);
-    juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 16, { 0, 4 }).drawForPath (g, bg);
-    g.setColour (theme::menuBg);
-    g.fillPath (bg);
-    g.setColour (juce::Colours::white.withAlpha (0.07f));
-    g.strokePath (bg, juce::PathStrokeType (1.0f));
-
-    juce::Graphics::ScopedSaveState ss (g);
+    const auto bounds = getLocalBounds().toFloat();
+    browserDrawerBody (g, bounds);
+    juce::Graphics::ScopedSaveState clip (g);
     g.reduceClipRegion (getLocalBounds().withTrimmedTop (int (topInset())));
     const auto mouse = getMouseXYRelative().toFloat();
     const int hot = isMouseOver (true) ? rowAt (mouse) : -1;
@@ -900,110 +971,135 @@ void PresetPanel::paint (juce::Graphics& g)
     {
         const auto& row = rows[size_t (i)];
         const auto r = rowBounds (i);
-        if (r.getBottom() < 0.0f || r.getY() > b.getHeight()) continue;
+        if (! r.intersects (bounds)) continue;
+        const auto icon = juce::Point<float> (32.0f, r.getCentreY());
+        auto text = r.withTrimmedLeft (49.0f).withTrimmedRight (7.0f);
+        const bool active = (i == hot && ! dragging) || (dragging && i == dropRow);
+        const auto colour = active ? browserBright : browserMuted;
+        if (active && row.kind != Kind::Divider && row.kind != Kind::Section)
+        {
+            g.setColour (browserHover);
+            g.fillRect (r);
+        }
 
-        if (row.kind == Kind::Section)
+        switch (row.kind)
         {
-            if (row.text.isEmpty()) { g.setColour (juce::Colours::white.withAlpha (0.08f)); g.fillRect (r.getX() + 6.0f, r.getCentreY(), r.getWidth() - 12.0f, 1.0f); }
-            else { g.setFont (font (11.5f, true)); shadowText (g, row.text.toUpperCase(), r.withTrimmedLeft (10.0f), juce::Justification::centredLeft, textFaint.brighter (0.2f)); }
-            if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.5f)); g.drawRoundedRectangle (r.reduced (3.0f, 1.0f), 4.0f, 1.4f); }
-            continue;
-        }
-        if (row.kind == Kind::Toolbar)
-        {
-            for (int t = 0; t < 5; ++t)
+            case Kind::KeepScale:
             {
-                const auto ib = toolBounds (r, t);
-                const bool over = i == hot && ib.expanded (6.0f).contains (mouse);
-                const bool act = (t == 2 && searchActive) || (t == 4 && favOnly);
-                if (over) { g.setColour (juce::Colours::white.withAlpha (0.08f)); g.fillRoundedRectangle (ib.expanded (4.0f), 5.0f); }
-                const juce::Colour c = act ? (t == 4 ? juce::Colour (0xffe8c15a) : violet.brighter (0.2f))
-                                           : textDim.interpolatedWith (text, over ? 1.0f : 0.3f);
-                drawToolIcon (g, ib, t, c, act);
+                g.setColour (keepScale ? browserLilac : browserMuted);
+                for (int key = 0; key < 4; ++key)
+                {
+                    const float x = icon.x - 7.0f + 4.7f * float (key);
+                    const float top = icon.y - 4.7f + 2.0f * float (key % 2);
+                    g.drawLine (x, top, x, icon.y + 3.5f, 1.25f);
+                    g.fillEllipse (x - 1.3f, top - 0.8f, 2.6f, 1.8f);
+                }
+                g.drawLine (icon.x - 7.0f, icon.y + 3.5f, icon.x + 7.0f, icon.y + 3.5f, 1.25f);
+                browserLabel (g, row.text, text, keepScale ? browserLilac : colour, true);
+                break;
             }
-            continue;
-        }
-        if (row.kind == Kind::Folder)
-        {
-            if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.22f)); g.fillRoundedRectangle (r.reduced (2.0f, 1.0f), 4.0f); }
-            g.setFont (font (12.0f, true));
-            shadowText (g, juce::String::fromUTF8 ("\xF0\x9F\x93\x81  ") + row.text.toUpperCase(), r.withTrimmedLeft (10.0f).withTrimmedRight (50.0f), juce::Justification::centredLeft, textDim.interpolatedWith (text, i == hot ? 1.0f : 0.35f));
-            if (i == hot && ! dragging)
+            case Kind::Timing:
             {
-                const auto pb = plusBounds (r);
-                g.setColour (text.withAlpha (0.85f));
-                g.drawLine (pb.getCentreX() - 4.0f, pb.getCentreY(), pb.getCentreX() + 4.0f, pb.getCentreY(), 1.6f);
-                g.drawLine (pb.getCentreX(), pb.getCentreY() - 4.0f, pb.getCentreX(), pb.getCentreY() + 4.0f, 1.6f);
-                drawTrash (g, trashBounds (r));
+                const auto top = juce::Rectangle<float> (11.0f, 25.0f).withCentre (icon);
+                g.setColour (browserMuted);
+                g.drawRoundedRectangle (top, 5.5f, 1.0f);
+                g.setColour (lowLatency ? browserLilac : (stabilizer ? browserGold : browserMuted));
+                g.fillEllipse (juce::Rectangle<float> (6.3f, 6.3f).withCentre (icon.translated (0.0f, lowLatency ? 6.0f : -6.0f)));
+                browserLabel (g, "Note Stabilizer", text.removeFromTop (15.5f), ! lowLatency && stabilizer ? browserGold : colour, ! lowLatency && stabilizer);
+                browserLabel (g, "Low Latency", text, lowLatency ? browserLilac : colour, lowLatency);
+                break;
             }
-            continue;
+            case Kind::NewPreset:
+                browserPlus (g, icon, colour);
+                browserLabel (g, row.text, text, colour, false, true);
+                break;
+            case Kind::NewFolder:
+                browserFolder (g, icon.translated (-1.0f, 0.0f), colour);
+                browserPlus (g, icon.translated (5.0f, 1.0f), colour);
+                browserLabel (g, row.text, text, colour, false, true);
+                break;
+            case Kind::Divider:
+                g.setColour (browserMuted);
+                g.fillRect (25.0f, r.getCentreY(), r.getWidth() - 48.0f, 1.0f);
+                break;
+            case Kind::Folder:
+                browserChevron (g, { 11.0f, icon.y }, openFolders.contains (row.folder) || favOnly || filter.isNotEmpty());
+                browserFolder (g, icon, colour);
+                if (active && ! dragging)
+                {
+                    browserPlus (g, plusBounds (r).getCentre(), browserMuted);
+                    if (! row.factory) browserTrash (g, trashBounds (r));
+                    text.setRight (plusBounds (r).getX() - 1.0f);
+                }
+                browserLabel (g, row.text, text, colour, true);
+                break;
+            case Kind::Preset:
+            {
+                const bool selected = row.text == current;
+                if (active || row.favorite)
+                {
+                    const auto star = plusBounds (r).reduced (2.0f);
+                    drawStar (g, star, row.favorite, row.favorite ? browserGold : browserMuted);
+                    if (active && ! row.factory) browserTrash (g, trashBounds (r));
+                    text.setRight (star.getX() - 2.0f);
+                }
+                browserLabel (g, row.text, text, selected ? browserLilac : colour, selected);
+                break;
+            }
+            case Kind::Section:
+                browserLabel (g, row.text, text, colour, true);
+                break;
         }
-        auto& a = rowAnim (i); a.setTarget (i == hot ? 1.0f : 0.0f);
-        const bool isCurrent = row.index >= 0 && row.text == current;
-        if (a.get() > 0.0f)
-        {
-            const auto rr = r.reduced (0.0f, 1.5f);
-            g.setColour (juce::Colours::white.withAlpha (0.06f * a.get()));
-            g.fillRoundedRectangle (rr, 4.0f);
-            g.setColour (juce::Colours::white.withAlpha (0.3f * a.get()));
-            g.drawRoundedRectangle (rr, 4.0f, 1.0f);
-        }
-        if (isCurrent) { g.setColour (violet.brighter (0.3f)); g.fillEllipse (r.getX() + 9.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f); }
-        g.setFont (font (13.5f, isCurrent));
-        shadowText (g, row.text, r.withTrimmedLeft (22.0f).withTrimmedRight (48.0f), juce::Justification::centredLeft, isCurrent ? text : textDim.interpolatedWith (text, a.get()));
-        if ((row.favorite || i == hot) && ! dragging)
-            drawStar (g, starBounds (r), row.favorite, row.favorite ? juce::Colour (0xffe8c15a) : text.withAlpha (0.65f));
-        if (i == hot && ! row.factory && ! dragging) drawTrash (g, trashBounds (r));
     }
 
-    if (dragging && dragIndex >= 0)
-    {
-        const auto box = juce::Rectangle<float> (150.0f, 22.0f).withCentre (mouse.translated (0.0f, -14.0f));
-        g.setColour (bg3.withAlpha (0.95f));
-        g.fillRoundedRectangle (box, 5.0f);
-        g.setColour (violet.withAlpha (0.6f));
-        g.drawRoundedRectangle (box, 5.0f, 1.0f);
-        juce::String nm;
-        for (const auto& rr : rows) if (rr.index == dragIndex) nm = rr.text;
-        g.setFont (font (12.5f, true));
-        shadowText (g, nm, box, juce::Justification::centred, text);
-    }
+    if (dragging)
+        for (const auto& row : rows)
+            if (row.index == dragIndex)
+            {
+                const auto ghost = juce::Rectangle<float> (110.0f, kRowH).withCentre (mouse.translated (0.0f, -13.0f));
+                browserLabel (g, row.text, ghost, browserBright, true);
+                break;
+            }
 }
 
 void PresetPanel::mouseDown (const juce::MouseEvent& e)
 {
-    downPos = e.position; dragging = false; dragIndex = -1; dropRow = -1;
+    downPos = e.position;
+    dragging = false;
+    dragIndex = dropRow = -1;
     const int i = rowAt (e.position);
-    if (i >= 0 && rows[size_t (i)].kind == Kind::Preset && ! rows[size_t (i)].factory
-        && ! trashBounds (rowBounds (i)).contains (e.position)
-        && ! starBounds (rowBounds (i)).contains (e.position))
-        dragIndex = rows[size_t (i)].index;
+    if (! e.mods.isLeftButtonDown() || i < 0) return;
+    const auto& row = rows[size_t (i)];
+    const auto r = rowBounds (i);
+    if (row.kind == Kind::Preset && ! row.factory && ! trashBounds (r).contains (e.position)
+        && ! plusBounds (r).contains (e.position))
+        dragIndex = row.index;
 }
 
 void PresetPanel::mouseDrag (const juce::MouseEvent& e)
 {
     if (dragIndex < 0) return;
     if (! dragging && e.position.getDistanceFrom (downPos) > 5.0f) dragging = true;
-    if (dragging)
-    {
-        const int i = rowAt (e.position);
-        const bool isTarget = i >= 0 && (rows[size_t (i)].kind == Kind::Folder
-                                         || (rows[size_t (i)].kind == Kind::Section && rows[size_t (i)].text == "My presets"));
-        dropRow = isTarget ? i : -1;
-        repaint();
-    }
+    if (! dragging) return;
+    const int i = rowAt (e.position);
+    dropRow = i >= 0 && (rows[size_t (i)].kind == Kind::Folder || rows[size_t (i)].text == "My presets") ? i : -1;
+    repaint();
 }
 
 void PresetPanel::mouseUp (const juce::MouseEvent& e)
 {
+    if (e.mods.isPopupMenu())
+    {
+        showActions (e);
+        return;
+    }
     if (dragging)
     {
         if (dragIndex >= 0 && dropRow >= 0 && onMove)
-        {
-            const auto& dr = rows[size_t (dropRow)];
-            onMove (dragIndex, dr.kind == Kind::Folder ? dr.folder : juce::String());
-        }
-        dragging = false; dragIndex = -1; dropRow = -1; repaint();
+            onMove (dragIndex, rows[size_t (dropRow)].folder);
+        dragging = false;
+        dragIndex = dropRow = -1;
+        repaint();
         return;
     }
     dragIndex = -1;
@@ -1013,188 +1109,269 @@ void PresetPanel::mouseUp (const juce::MouseEvent& e)
     const auto r = rowBounds (i);
     switch (row.kind)
     {
+        case Kind::KeepScale: if (onToggleKeepScale) onToggleKeepScale(); break;
+        case Kind::Timing: if (onToggleTiming) onToggleTiming(); break;
+        case Kind::NewPreset: if (onNewPreset) onNewPreset(); break;
+        case Kind::NewFolder: if (onNewFolder) onNewFolder(); break;
         case Kind::Preset:
             if (! row.factory && trashBounds (r).contains (e.position)) { if (onDelete) onDelete (row.index); }
-            else if (starBounds (r).contains (e.position)) { if (onToggleFavorite) onToggleFavorite (row.index); }
+            else if (plusBounds (r).contains (e.position)) { if (onToggleFavorite) onToggleFavorite (row.index); }
             else if (onLoad) onLoad (row.index);
             break;
         case Kind::Folder:
             if (plusBounds (r).contains (e.position)) { if (onSaveToFolder) onSaveToFolder (row.folder); }
-            else if (trashBounds (r).contains (e.position)) { if (onDeleteFolder) onDeleteFolder (row.folder); }
-            break;
-        case Kind::Toolbar:
-            switch (toolAt (r, e.position))
+            else if (! row.factory && trashBounds (r).contains (e.position)) { if (onDeleteFolder) onDeleteFolder (row.folder); }
+            else
             {
-                case 0: if (onNewPreset) onNewPreset(); break;
-                case 1: if (onNewFolder) onNewFolder(); break;
-                case 2:
-                    searchActive = ! searchActive;
-                    searchBox.setVisible (searchActive);
-                    if (! searchActive) { searchBox.setText ({}, false); filter = {}; }
-                    if (onHeightChanged) onHeightChanged();
-                    resized();
-                    rebuild();
-                    if (searchActive) searchBox.grabKeyboardFocus();
-                    break;
-                case 3: if (onOpenFolder) onOpenFolder(); break;
-                case 4: favOnly = ! favOnly; rebuild(); if (onHeightChanged) onHeightChanged(); break;
-                default: break;
+                const auto folder = row.folder;
+                if (openFolders.contains (folder)) openFolders.removeString (folder);
+                else openFolders.add (folder);
+                rebuild();
             }
             break;
         default: break;
     }
 }
 
-void PresetPanel::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& w)
+void PresetPanel::showActions (const juce::MouseEvent& e)
+{
+    juce::PopupMenu menu;
+    menu.addItem (1, "Search presets", true, searchActive);
+    menu.addItem (2, "Favourites only", true, favOnly);
+    menu.addItem (3, "Open preset folder");
+    const auto screen = e.getScreenPosition();
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this)
+                           .withTargetScreenArea ({ screen.x, screen.y, 1, 1 }),
+                        [self = juce::Component::SafePointer<PresetPanel> (this)] (int result)
+    {
+        if (self == nullptr) return;
+        if (result == 1)
+        {
+            self->searchActive = ! self->searchActive;
+            self->searchBox.setVisible (self->searchActive);
+            if (self->searchActive) self->searchBox.grabKeyboardFocus();
+            else
+            {
+                self->searchBox.setText ({}, false);
+                self->filter = {};
+            }
+            self->rebuild();
+        }
+        else if (result == 2)
+        {
+            self->favOnly = ! self->favOnly;
+            self->rebuild();
+        }
+        else if (result == 3 && self->onOpenFolder) self->onOpenFolder();
+    });
+}
+
+void PresetPanel::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
 {
     const float maxScroll = juce::jmax (0.0f, contentHeight() - float (getHeight()));
-    scroll = juce::jlimit (0.0f, maxScroll, scroll - w.deltaY * 120.0f);
+    scroll = juce::jlimit (0.0f, maxScroll, scroll - wheel.deltaY * 120.0f);
     repaint();
 }
 
-void GroupBrowser::setData (const juce::StringArray& groupNames, const std::vector<GroupInstanceRow>& instances)
+GroupBrowser::GroupBrowser()
+{
+    addChildComponent (nameEditor);
+    nameEditor.setFont (theme::font (13.1f, true));
+    nameEditor.setIndents (0, 0);
+    nameEditor.setJustification (juce::Justification::centredLeft);
+    nameEditor.setColour (juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+    nameEditor.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+    nameEditor.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
+    nameEditor.setColour (juce::TextEditor::textColourId, browserBright);
+    nameEditor.setColour (juce::TextEditor::highlightColourId, browserLilac.withAlpha (0.38f));
+    nameEditor.onReturnKey = [this] { endRename (true); };
+    nameEditor.onEscapeKey = [this] { endRename (false); };
+    nameEditor.onFocusLost = [this] { endRename (true); };
+}
+
+void GroupBrowser::setData (const juce::StringArray& groupNames, const std::vector<GroupInstanceRow>& entries)
+{
+    names = groupNames;
+    instances = entries;
+    rebuild();
+}
+
+void GroupBrowser::rebuild()
 {
     rows.clear();
-    for (int g = 0; g < 4; ++g)
+    groupSizes.fill (0);
+    selectedGroup = -2;
+    for (const auto& item : instances)
     {
-        rows.push_back ({ Kind::GroupHeader, g, 0, g < groupNames.size() ? groupNames[g] : "Group " + juce::String (g + 1), false });
-        int count = 0;
-        for (const auto& it : instances)
-            if (it.group == g) { rows.push_back ({ Kind::Instance, g, it.id, it.label, it.self }); ++count; }
-        if (count == 0) rows.push_back ({ Kind::Empty, g, 0, {}, false });
+        if (juce::isPositiveAndBelow (item.group + 1, int (groupSizes.size())))
+            ++groupSizes[size_t (item.group + 1)];
+        if (item.self) selectedGroup = item.group;
     }
-    rows.push_back ({ Kind::GroupHeader, -1, 0, "Ungrouped", false });
-    for (const auto& it : instances)
-        if (it.group < 0) rows.push_back ({ Kind::Instance, -1, it.id, it.label, it.self });
+
+    for (int group = -1; group < 4; ++group)
+    {
+        const auto label = group < 0 ? juce::String ("No Group") : names[group];
+        rows.push_back ({ group, -1, label, true, false });
+        if (openGroups[size_t (group + 1)])
+            for (const auto& item : instances)
+                if (item.group == group)
+                    rows.push_back ({ group, item.id, item.label, false, item.self });
+    }
+
+    const auto maxScroll = juce::jmax (0.0f, float (rows.size()) * kRowH - float (getHeight()));
+    scroll = juce::jlimit (0.0f, maxScroll, scroll);
     repaint();
-}
-
-float GroupBrowser::contentHeight() const
-{
-    float h = 8.0f;
-    for (const auto& r : rows) h += rowHeight (r);
-    return h + 8.0f;
-}
-int GroupBrowser::preferredHeight() const { return int (std::ceil (contentHeight())); }
-
-theme::Anim& GroupBrowser::rowAnim (int i)
-{
-    while (int (hover.size()) <= i) hover.push_back (std::make_unique<theme::Anim> (*this, 0.3f));
-    return *hover[size_t (i)];
 }
 
 juce::Rectangle<float> GroupBrowser::rowBounds (int i) const
 {
-    float y = 8.0f;
-    for (int j = 0; j < i && j < int (rows.size()); ++j) y += rowHeight (rows[size_t (j)]);
-    const float h = juce::isPositiveAndBelow (i, int (rows.size())) ? rowHeight (rows[size_t (i)]) : kRowH;
-    return { 8.0f, y, float (getWidth()) - 16.0f, h };
+    return { 0.0f, float (i) * kRowH - scroll, float (getWidth()), kRowH };
 }
 
-int GroupBrowser::rowAt (juce::Point<float> p) const
+int GroupBrowser::rowAt (juce::Point<float> point) const
 {
-    float y = 8.0f;
-    for (int i = 0; i < int (rows.size()); ++i)
-    {
-        const float h = rowHeight (rows[size_t (i)]);
-        if (p.y >= y && p.y < y + h) return i;
-        y += h;
-    }
-    return -1;
+    if (! getLocalBounds().toFloat().contains (point)) return -1;
+    const int i = int ((point.y + scroll) / kRowH);
+    return juce::isPositiveAndBelow (i, int (rows.size())) ? i : -1;
 }
 
 void GroupBrowser::paint (juce::Graphics& g)
 {
-    using namespace theme;
-    const auto b = getLocalBounds().toFloat();
-    juce::Path bg;
-    bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), 8.0f, 8.0f);
-    juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 18, { 0, 4 }).drawForPath (g, bg);
-    g.setColour (theme::menuBg);
-    g.fillPath (bg);
-    g.setColour (juce::Colours::white.withAlpha (0.07f));
-    g.strokePath (bg, juce::PathStrokeType (1.0f));
-
-    juce::Graphics::ScopedSaveState ss (g);
-    g.reduceClipRegion (getLocalBounds());
+    const auto bounds = getLocalBounds().toFloat();
+    browserDrawerBody (g, bounds);
     const auto mouse = getMouseXYRelative().toFloat();
     const int hot = isMouseOver (true) ? rowAt (mouse) : -1;
+    const auto grid = icons::grid();
 
     for (int i = 0; i < int (rows.size()); ++i)
     {
         const auto& row = rows[size_t (i)];
         const auto r = rowBounds (i);
-        if (row.kind == Kind::GroupHeader)
+        if (! r.intersects (bounds)) continue;
+        const bool renaming = row.header && renameGroup >= 0 && row.group == renameGroup;
+        const bool active = renaming || (! dragging && i == hot) || (dragging && i == dropRow);
+        if (active)
         {
-            if (dragging && dropRow == i) { g.setColour (violet.withAlpha (0.22f)); g.fillRoundedRectangle (r.reduced (1.0f), 4.0f); }
-            g.setFont (font (12.5f, true));
-            shadowText (g, row.text.toUpperCase(), r.withTrimmedLeft (10.0f).withTrimmedRight (54.0f), juce::Justification::centredLeft, row.group < 0 ? textFaint.brighter (0.2f) : (i == hot && ! dragging ? violet.brighter (0.4f) : text));
-            if (row.group >= 0 && i == hot && ! dragging)
-            {
-                g.setFont (font (10.5f, true));
-                shadowText (g, "rename", r.withTrimmedRight (10.0f), juce::Justification::centredRight, textDim);
-            }
-            continue;
+            g.setColour (browserHover);
+            g.fillRect (r);
         }
-        if (row.kind == Kind::Empty)
+        const auto colour = row.self || (row.header && row.group >= 0 && row.group == selectedGroup)
+                          ? browserLilac : (active ? browserBright : browserMuted);
+        const float y = r.getCentreY();
+        if (row.header)
         {
-            g.setFont (font (11.5f, false));
-            shadowText (g, juce::String::fromUTF8 ("\xE2\x80\x94 empty \xE2\x80\x94"), r.withTrimmedLeft (26.0f), juce::Justification::centredLeft, textFaint.withAlpha (0.5f));
-            continue;
+            const auto groupIndex = size_t (row.group + 1);
+            if (groupSizes[groupIndex] > 0)
+                browserChevron (g, { 11.0f, y }, openGroups[groupIndex]);
+            g.setColour (colour);
+            g.fillPath (grid, grid.getTransformToScaleToFit ({ 24.0f, y - 7.5f, 15.0f, 15.0f }, true));
         }
-        auto& a = rowAnim (i); a.setTarget (i == hot ? 1.0f : 0.0f);
-        if (a.get() > 0.0f) { g.setColour (juce::Colours::white.withAlpha (0.06f * a.get())); g.fillRoundedRectangle (r.reduced (0.0f, 1.5f), 4.0f); }
-        if (row.self) { g.setColour (violet.brighter (0.3f)); g.fillEllipse (r.getX() + 12.0f, r.getCentreY() - 3.0f, 6.0f, 6.0f); }
-        g.setFont (font (13.0f, row.self));
-        shadowText (g, row.text + (row.self ? juce::String ("  (this)") : juce::String()), r.withTrimmedLeft (26.0f), juce::Justification::centredLeft, textDim.interpolatedWith (text, juce::jmax (row.self ? 0.9f : 0.5f, a.get())));
+        else if (row.self)
+        {
+            g.setColour (browserLilac);
+            g.drawVerticalLine (26, y - 3.0f, y + 3.0f);
+            g.drawVerticalLine (29, y - 5.2f, y + 5.2f);
+            g.drawVerticalLine (32, y - 3.4f, y + 3.4f);
+        }
+        if (! row.header && i == hot && ! dragging)
+        {
+            g.setColour (browserMuted);
+            g.drawVerticalLine (10, y - 4.0f, y + 4.0f);
+            g.drawVerticalLine (14, y - 4.0f, y + 4.0f);
+        }
+        if (! renaming)
+            browserLabel (g, row.text, r.withTrimmedLeft (50.0f).withTrimmedRight (7.0f), colour, row.header || row.self);
     }
 
-    if (dragging && dragId >= 0)
-    {
-        juce::String nm;
-        for (const auto& rr : rows) if (rr.kind == Kind::Instance && rr.id == dragId) nm = rr.text;
-        const auto box = juce::Rectangle<float> (150.0f, 22.0f).withCentre (mouse.translated (0.0f, -14.0f));
-        g.setColour (bg3.withAlpha (0.95f));
-        g.fillRoundedRectangle (box, 5.0f);
-        g.setColour (violet.withAlpha (0.6f));
-        g.drawRoundedRectangle (box, 5.0f, 1.0f);
-        g.setFont (font (12.5f, true));
-        shadowText (g, nm, box, juce::Justification::centred, text);
-    }
+    if (dragging)
+        for (const auto& item : instances)
+            if (item.id == dragId)
+            {
+                const auto ghost = juce::Rectangle<float> (95.0f, kRowH).withCentre (mouse.translated (0.0f, -12.0f));
+                browserLabel (g, item.label, ghost, browserBright, true);
+                break;
+            }
 }
 
 void GroupBrowser::mouseDown (const juce::MouseEvent& e)
 {
-    downPos = e.position; dragging = false; dragId = -1; dropRow = -1;
+    downPos = e.position;
+    dragging = false;
+    dragId = dropRow = -1;
     const int i = rowAt (e.position);
-    if (i >= 0 && rows[size_t (i)].kind == Kind::Instance) dragId = rows[size_t (i)].id;
+    if (i >= 0 && ! rows[size_t (i)].header && e.mods.isLeftButtonDown())
+        dragId = rows[size_t (i)].id;
 }
 
 void GroupBrowser::mouseDrag (const juce::MouseEvent& e)
 {
     if (dragId < 0) return;
     if (! dragging && e.position.getDistanceFrom (downPos) > 5.0f) dragging = true;
-    if (dragging)
-    {
-        const int i = rowAt (e.position);
-        dropRow = (i >= 0 && rows[size_t (i)].kind == Kind::GroupHeader) ? i : -1;
-        repaint();
-    }
+    if (! dragging) return;
+    const int i = rowAt (e.position);
+    dropRow = i >= 0 && rows[size_t (i)].header ? i : -1;
+    repaint();
 }
 
 void GroupBrowser::mouseUp (const juce::MouseEvent& e)
 {
     if (dragging)
     {
-        if (dragId >= 0 && dropRow >= 0 && onAssign) onAssign (dragId, rows[size_t (dropRow)].group);
-        dragging = false; dragId = -1; dropRow = -1; repaint();
+        if (dropRow >= 0 && onAssign) onAssign (dragId, rows[size_t (dropRow)].group);
+        dragging = false;
+        dragId = dropRow = -1;
+        repaint();
         return;
     }
     dragId = -1;
     const int i = rowAt (e.position);
-    if (i < 0) return;
+    if (i < 0 || ! rows[size_t (i)].header) return;
+    const auto group = rows[size_t (i)].group;
+    const auto index = size_t (group + 1);
+    if (e.position.x < 44.0f && groupSizes[index] > 0)
+    {
+        openGroups[index] = ! openGroups[index];
+        rebuild();
+    }
+    else if (group >= 0 && e.position.x >= 44.0f)
+        beginRename (i);
+}
+
+void GroupBrowser::beginRename (int i)
+{
+    endRename (true);
     const auto& row = rows[size_t (i)];
-    if (row.kind == Kind::GroupHeader && row.group >= 0 && onRename) onRename (row.group);
+    renameGroup = row.group;
+    nameEditor.setBounds (rowBounds (i).withTrimmedLeft (50.0f).withTrimmedRight (6.0f).toNearestInt());
+    nameEditor.setText (row.text, false);
+    nameEditor.setVisible (true);
+    nameEditor.grabKeyboardFocus();
+    nameEditor.selectAll();
+    repaint();
+}
+
+void GroupBrowser::endRename (bool commit)
+{
+    if (renameGroup < 0) return;
+    const int group = renameGroup;
+    renameGroup = -1;
+    const auto name = nameEditor.getText().trim();
+    nameEditor.setVisible (false);
+    if (commit && onRename) onRename (group, name);
+    repaint();
+}
+
+void GroupBrowser::visibilityChanged()
+{
+    if (! isVisible()) endRename (true);
+}
+
+void GroupBrowser::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails& wheel)
+{
+    endRename (true);
+    const auto maxScroll = juce::jmax (0.0f, float (rows.size()) * kRowH - float (getHeight()));
+    scroll = juce::jlimit (0.0f, maxScroll, scroll - wheel.deltaY * 120.0f);
+    repaint();
 }
 
 SavePresetCard::SavePresetCard()
@@ -1694,39 +1871,37 @@ void ColorPanel::mouseUp (const juce::MouseEvent&) { drag = -1; }
 
 juce::Rectangle<float> BrowserTabs::tabRect (int i) const
 {
-    const float w = 86.0f, pad = 14.0f;
-    return { pad + float (i) * (w + 6.0f), 0.0f, w, float (getHeight()) };
+    return { i == 0 ? 0.0f : float (getWidth()) - 86.0f, 0.0f, 86.0f, float (getHeight()) };
 }
 
 void BrowserTabs::paint (juce::Graphics& g)
 {
-    using namespace theme;
-    const auto b = getLocalBounds().toFloat();
-    juce::Path bg;
-    bg.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight() + 8.0f, 8.0f, 8.0f, true, true, false, false);
-    g.setColour (theme::menuTab);
-    g.fillPath (bg);
-
-    const char* names[] = { "Presets", "Groups" };
+    const char* names[] { "Presets", "Groups" };
     const auto mouse = getMouseXYRelative().toFloat();
     for (int i = 0; i < 2; ++i)
     {
         const auto r = tabRect (i);
-        const bool sel = i == tab, hot = r.contains (mouse);
-        g.setFont (font (13.5f, sel));
-        shadowText (g, names[i], r, juce::Justification::centred, sel ? text : textDim.interpolatedWith (text, hot ? 0.5f : 0.0f));
-        if (sel)
+        const bool selected = i == tab;
+        if (selected)
         {
-            g.setColour (violet.brighter (0.2f));
-            g.fillRoundedRectangle (r.getCentreX() - 16.0f, r.getBottom() - 3.0f, 32.0f, 2.5f, 1.25f);
+            juce::Path shape;
+            shape.addRoundedRectangle (r.getX(), r.getY(), r.getWidth(), r.getHeight(), 7.0f, 7.0f,
+                                       true, true, false, false);
+            juce::Graphics::ScopedSaveState clip (g);
+            g.reduceClipRegion (shape);
+            browserSurface (g, r, { 0.0f, 0.0f, float (getWidth()), 462.0f });
         }
+        g.setColour (theme::lightMode ? theme::text : (selected ? browserBright : browserMuted));
+        if (! selected && r.contains (mouse)) g.setColour (theme::lightMode ? theme::text : browserMuted.brighter (0.3f));
+        g.setFont (theme::font (13.1f, selected));
+        g.drawText (names[i], r, juce::Justification::centred, true);
     }
 }
 
 void BrowserTabs::mouseUp (const juce::MouseEvent& e)
 {
     for (int i = 0; i < 2; ++i)
-        if (tabRect (i).contains (e.position)) { setTab (i); if (onSelect) onSelect (i); return; }
+        if (tabRect (i).contains (e.position) && i != tab && onSelect) { onSelect (i); return; }
 }
 
 // ---- AutoKeyCard

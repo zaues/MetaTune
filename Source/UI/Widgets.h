@@ -33,6 +33,9 @@ class IconButton : public juce::Button
 public:
     IconButton (const juce::String& name, juce::Path icon, juce::String caption = {}, juce::Path icon2 = {});
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+    void setIcon (juce::Path replacement) { icon = std::move (replacement); repaint(); }
+    std::function<void (const juce::ModifierKeys&)> onModifiedClick;
+    void clicked (const juce::ModifierKeys& modifiers) override { if (onModifiedClick) onModifiedClick (modifiers); }
     juce::Colour onColour = theme::text, idleColour;
     juce::Point<float> iconOffset;
     float iconScale = 0.62f, captionInset = -1.0f;
@@ -63,12 +66,14 @@ class TextPill : public juce::Button
 {
 public:
     enum class Kind { Primary, Plain, SplitLeft, SplitRight };
-    TextPill (const juce::String& text, Kind k) : juce::Button (text), kind (k) { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    TextPill (const juce::String& text, Kind k, juce::Colour selected = {})
+        : juce::Button (text), kind (k), selectedAccent (selected) { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     void buttonStateChanged() override { hover.setTarget (isOver() ? 1.0f : 0.0f); }
 
 private:
     Kind kind;
+    juce::Colour selectedAccent;
     theme::Anim hover { *this };
 };
 
@@ -136,6 +141,7 @@ public:
     std::function<void (int)> onSelect;
     std::function<void()> onBrowse; // the grid icon opens the Group Browser
     void setSelected (int g) { if (g != selected) { selected = g; repaint(); } }
+    void setBypassBlend (float amount) { bypassBlend = amount; repaint(); }
     void setCount (int g, int n) { if (counts[g] != n) { counts[g] = n; repaint(); } }
     void setBrowseActive (bool a) { if (a != browseActive) { browseActive = a; repaint(); } } // grey the grid/box icon while its browser is open
     void paint (juce::Graphics&) override;
@@ -152,6 +158,7 @@ private:
     int selected = -1, hover = -1;
     int counts[4] {};
     bool browseActive = false;
+    float bypassBlend = 0.0f;
 };
 
 // Header preset box: "No preset selected", a preset icon and up/down arrows.
@@ -196,6 +203,8 @@ public:
     std::function<void()> onMouseLeave;
 
     void setState (int root, int scaleIndex, bool flats);
+    int rootAt (juce::Point<float>) const;
+    int scaleAt (juce::Point<float>) const;
     void paint (juce::Graphics&) override;
     void mouseUp (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override { repaint(); }
@@ -211,7 +220,7 @@ private:
     theme::Anim& cellAnim (int i);
 };
 
-// Two-tab header ("Presets" / "Groups") for the browser opened from the group box icon.
+// Presets / Groups tabs for the drawer anchored to the left group rail.
 class BrowserTabs : public juce::Component, public juce::SettableTooltipClient
 {
 public:
@@ -228,106 +237,95 @@ private:
     int tab = 0;
 };
 
-// One preset as the panel sees it (folder "" = root / factory).
 struct PresetItem { juce::String name, folder; bool factory = false; bool favorite = false; };
 
-// Preset list that drops down from the header preset box, inside the plugin window. Factory presets,
-// then user sub-folders (each with a + to save-into and a trash to delete), then root "My presets",
-// then New preset / New folder / Open folder. User presets have a hover trash button and can be
-// dragged onto a folder (or "My presets") to move them. Wheel scrolls when it overflows.
 class PresetPanel : public juce::Component
 {
 public:
     PresetPanel();
-    std::function<void (int index)> onLoad;                               // index into the flat preset list
-    std::function<void()> onNewPreset, onNewFolder, onOpenFolder, onMouseLeave;
-    std::function<void (const juce::String& folder)> onSaveToFolder;      // save current preset into a folder
-    std::function<void (int index)> onDelete;                            // trash a user preset
-    std::function<void (int index)> onToggleFavorite;                    // star / unstar a preset
-    std::function<void()> onHeightChanged;                               // search / favourites changed the preferred height
-    std::function<void (const juce::String& folder)> onDeleteFolder;     // trash a folder
-    std::function<void (int index, const juce::String& folder)> onMove;  // move a preset to a folder ("" = root)
+    std::function<void (int index)> onLoad, onDelete, onToggleFavorite;
+    std::function<void()> onNewPreset, onNewFolder, onOpenFolder, onToggleKeepScale, onToggleTiming;
+    std::function<void (const juce::String& folder)> onSaveToFolder, onDeleteFolder;
+    std::function<void (int index, const juce::String& folder)> onMove;
 
-    void setItems (const std::vector<PresetItem>& items, const juce::String& current);
-    int preferredHeight() const;
+    void setItems (const std::vector<PresetItem>& items, const juce::StringArray& folders, const juce::String& current);
+    void setModeOptions (bool keepScale, bool lowLatency, bool stabilizer);
     void resized() override;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override { repaint(); }
-    void mouseExit (const juce::MouseEvent&) override { repaint(); if (! dragging && onMouseLeave) onMouseLeave(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
 
 private:
-    enum class Kind { Section, Folder, Preset, Toolbar };
-    struct Row { Kind kind; juce::String text; juce::String folder; int index = -1; bool factory = false; bool favorite = false; };
-    static constexpr float kRowH = 26.0f, kHeaderH = 24.0f, kToolbarH = 42.0f;
-    float rowHeight (const Row& r) const
-    {
-        if (r.kind == Kind::Toolbar) return kToolbarH;
-        return (r.kind == Kind::Section || r.kind == Kind::Folder) ? kHeaderH : kRowH;
-    }
-    float topInset() const { return searchActive ? 34.0f : 0.0f; }
-    void rebuild(); // apply the search / favourites filter to allItems and lay out the rows
+    enum class Kind { KeepScale, Timing, NewPreset, NewFolder, Divider, Folder, Preset, Section };
+    struct Row { Kind kind; juce::String text, folder; int index = -1; bool factory = false, favorite = false; };
+    static constexpr float kRowH = 24.0f;
+    static float rowHeight (Kind kind);
+    float topInset() const { return searchActive ? 30.0f : 0.0f; }
+    void rebuild();
     float contentHeight() const;
     int rowAt (juce::Point<float>) const;
     juce::Rectangle<float> rowBounds (int i) const;
     juce::Rectangle<float> trashBounds (juce::Rectangle<float> row) const;
     juce::Rectangle<float> plusBounds (juce::Rectangle<float> row) const;
-    juce::Rectangle<float> starBounds (juce::Rectangle<float> row) const;
-    juce::Rectangle<float> toolBounds (juce::Rectangle<float> row, int i) const; // 0..4 footer icons
-    int toolAt (juce::Rectangle<float> row, juce::Point<float> p) const;
-    theme::Anim& rowAnim (int i);
+    void showActions (const juce::MouseEvent&);
 
     std::vector<PresetItem> allItems;
     std::vector<Row> rows;
+    juce::StringArray userFolders, openFolders;
     juce::String current, filter;
     bool searchActive = false, favOnly = false;
+    bool keepScale = true, lowLatency = false, stabilizer = false;
     juce::TextEditor searchBox;
     float scroll = 0;
-    int dragIndex = -1, dropRow = -1; // dragIndex = preset being dragged; dropRow = folder/section row under cursor
+    int dragIndex = -1, dropRow = -1;
     bool dragging = false;
     juce::Point<float> downPos;
-    std::vector<std::unique_ptr<theme::Anim>> hover;
 };
 
-// One live instance as the group browser sees it.
 struct GroupInstanceRow { int id = 0, group = -1; juce::String label; bool self = false; };
 
-// Group Browser: lists the four groups (named, click to rename) with their member instances, plus an
-// "Ungrouped" section. Drag an instance onto a group (or Ungrouped) to move it. Drops from the header
-// preset bar's "Groups" affordance.
 class GroupBrowser : public juce::Component
 {
 public:
-    std::function<void (int id, int group)> onAssign; // group -1 = ungroup
-    std::function<void (int group)> onRename;
-    std::function<void()> onMouseLeave;
+    GroupBrowser();
+    std::function<void (int id, int group)> onAssign;
+    std::function<void (int group, const juce::String& name)> onRename;
 
     void setData (const juce::StringArray& groupNames, const std::vector<GroupInstanceRow>& instances);
-    int preferredHeight() const;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override { repaint(); }
-    void mouseExit (const juce::MouseEvent&) override { repaint(); if (! dragging && onMouseLeave) onMouseLeave(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+    void visibilityChanged() override;
 
 private:
-    enum class Kind { GroupHeader, Instance, Empty };
-    struct Row { Kind kind; int group; int id; juce::String text; bool self; };
-    static constexpr float kRowH = 26.0f, kHeaderH = 26.0f;
-    float rowHeight (const Row& r) const { return r.kind == Kind::GroupHeader ? kHeaderH : kRowH; }
-    float contentHeight() const;
+    struct Row { int group; int id; juce::String text; bool header, self; };
+    static constexpr float kRowH = 24.0f;
+    void rebuild();
     juce::Rectangle<float> rowBounds (int i) const;
     int rowAt (juce::Point<float>) const;
-    theme::Anim& rowAnim (int i);
+    void beginRename (int row);
+    void endRename (bool commit);
 
     std::vector<Row> rows;
-    int dragId = -1, dropRow = -1; bool dragging = false;
+    std::vector<GroupInstanceRow> instances;
+    juce::StringArray names;
+    std::array<bool, 5> openGroups { true, true, true, true, true };
+    std::array<int, 5> groupSizes {};
+    int selectedGroup = -2;
+    juce::TextEditor nameEditor;
+    int renameGroup = -1;
+    float scroll = 0;
+    int dragId = -1, dropRow = -1;
+    bool dragging = false;
     juce::Point<float> downPos;
-    std::vector<std::unique_ptr<theme::Anim>> hover;
 };
 
 // "Save preset" card drawn inside the plugin: dims the window, centred dark card with a name field.

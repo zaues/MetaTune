@@ -20,6 +20,7 @@ struct Telemetry
     float confidence = 0;
     float rms = 0;
     int target = -1;      // target MIDI note, -1 = none
+    float sustainTimeRatio = 1.0f; // multiplier already applied to the Speed time constant
 };
 using TelemetryQueue = SpscQueue<Telemetry, 1024>; // ~2 s at the 2 ms hop
 

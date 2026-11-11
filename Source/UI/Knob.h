@@ -31,6 +31,9 @@ public:
     // 0..1 voice activity: the aggressive band glows brighter while someone is singing.
     void setActivity (float a) { if (std::abs (a - activity) > 0.01f) { activity = a; repaint(); } }
 
+    void setBypassBlend (float amount) { bypassBlend = amount; repaint(); }
+    void setSustainDisplay (float amount, float timeRatio);
+
     void paint (juce::Graphics&) override;
     bool hitTest (int x, int y) override;
     void mouseDown (const juce::MouseEvent&) override;
@@ -52,5 +55,7 @@ private:
     theme::Anim hover { *this };
     theme::Anim turning { *this, 0.3f }; // readout tint while the knob is being turned
     float activity = 0;
+    float bypassBlend = 0.0f;
+    float sustainAmount = 0.0f, sustainTimeRatio = 1.0f;
     std::unique_ptr<juce::TextEditor> editor;
 };

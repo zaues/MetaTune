@@ -576,9 +576,14 @@ TEST (sustain_tightens_held_notes)
             e.onEstimate (est);
             for (int i = 0; i < 96; ++i) c = 12.0 * std::log2 (e.nextRatio());
         }
+        const double heldRatio = e.sustainTimeRatio();
+        e.onEstimate ({});
+        CHECK_NEAR (e.sustainTimeRatio(), 1.0, 1e-9);
+        CHECK_NEAR (heldRatio, 1.0 - 0.97 * sustain, 1e-9);
         return std::abs (0.4 - c);
     };
     const double off = residual (0.0), on = residual (1.0);
+    CHECK (residual (-1.0) > off);
     std::printf ("  residual after 0.5 s: sustain 0 = %.3f st, sustain 1 = %.3f st\n", off, on);
     CHECK (on < off * 0.5);
 }

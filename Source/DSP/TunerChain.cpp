@@ -111,6 +111,7 @@ void TunerChain::process (float* const* ch, int numCh, int total) noexcept
                 t.confidence = e.confidence;
                 t.rms = e.rms;
                 t.target = engine.targetNote();
+                t.sustainTimeRatio = float (engine.sustainTimeRatio());
                 telemetry->push (t); // drops when the UI is not draining (editor closed)
             }
         });

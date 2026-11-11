@@ -53,6 +53,8 @@ inline juce::Colour violet { 0xffa855f7 };     // neon accent
 inline juce::Colour violetDeep { 0xff7c3aed }; // active toggles
 inline juce::Colour pink { 0xffec4899 };       // hot magenta accent
 inline juce::Colour coral { 0xfffb7185 };
+inline const juce::Colour bypassAccent { 0xffdf7779 };
+inline const juce::Colour majorAudition { 0xff87caff }, minorAudition { 0xff81e6d3 };
 inline juce::Colour blue { 0xff6aa8ff };
 inline juce::Colour cyan { 0xff06b6d4 };
 inline juce::Colour lavender { 0xffc4b5fd };

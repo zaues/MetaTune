@@ -2,6 +2,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "DSP/TunerChain.h"
 #include "DSP/Pitch/Scale.h"
+#include <optional>
 
 class MetaTuneProcessor : public juce::AudioProcessor, private juce::Timer
 {
@@ -17,6 +18,7 @@ public:
     juce::AudioProcessorParameter* getBypassParameter() const override { return bypassParam; }
 
     juce::AudioProcessorEditor* createEditor() override;
+    void updateTrackProperties (const TrackProperties&) override;
     bool hasEditor() const override { return true; }
 
     const juce::String getName() const override { return JucePlugin_Name; }
@@ -66,7 +68,7 @@ public:
     static int groupMemberCount (int group);
 
     // Group Browser: every live instance, named groups, and assignment by instance id.
-    struct GroupInstanceInfo { int id, group; juce::String preset; };
+    struct GroupInstanceInfo { int id, group; juce::String label; };
     int instanceId = 0;
     std::vector<GroupInstanceInfo> groupInstances() const;      // all live instances (sorted by id)
     void setGroup (int group);                                  // non-toggling assign (adopts the group's sound)
@@ -89,6 +91,14 @@ public:
         juce::String scaleLabel;                   // name of a picked Custom scale (e.g. "pent maj"); empty = hand-made
         juce::String presetName;                   // last loaded/saved preset; empty = none
         bool keepScale = true;                     // keep current key/scale when loading presets (Keep My Scale)
+        struct SavedScale
+        {
+            metatune::ScaleType type;
+            int root;
+            metatune::PitchClassMask mask;
+            juce::String label;
+        };
+        std::optional<SavedScale> scaleBeforeChromatic;
         bool scaleEverSet = false;                 // true once the user has picked any key/scale; hides the first-run prompt
         int group = -1;                            // -1 = not linked
         float scale = 0.85f;
@@ -99,6 +109,7 @@ private:
     std::vector<float> linkedValues() const;                  // normalised, in getParameters() order
     void receiveGroupValues (const std::vector<float>&);
     void syncGroup();                                         // timer: push local changes to the group
+    juce::String trackName; // supplied by the host when it supports track context
     std::vector<float> groupSynced;                           // values last exchanged with the group
     void process (juce::AudioBuffer<float>&, bool forceBypass) noexcept;
     void timerCallback() override; // message thread: keeps reported latency in step with Range

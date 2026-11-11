@@ -1,6 +1,5 @@
 #include "PluginEditor.h"
 #include "Parameters.h"
-#include <map>
 
 namespace layout
 {
@@ -9,34 +8,42 @@ constexpr float unitsPerPixel = float (MetaTuneEditor::kW) / MetaTuneEditor::ref
 constexpr float referenceUnits (int px) { return float (px) * unitsPerPixel; }
 constexpr int referencePixel (int px) { return int (referenceUnits (px) + 0.5f); }
 constexpr int headerH = referencePixel (55);
-constexpr int rowY = referencePixel (602), bottomY = referencePixel (655);
+// The recording places the stage divider about 63–64% down the window.
+constexpr int stageBottom = 670, modeBottom = 715;
+constexpr int rowY = referencePixel (stageBottom), bottomY = referencePixel (modeBottom);
 constexpr int rowH = bottomY - rowY;
 constexpr int leftW = referencePixel (182), rightX = referencePixel (1225);
-constexpr int footerY = referencePixel (1033), chromaticY = referencePixel (971);
+constexpr int footerY = referencePixel (1033), chromaticY = referencePixel (988);
 constexpr int keyboardLabelY = bottomY + KeyboardPanel::kHeatTop + 2 * (KeyboardPanel::kHeatH + KeyboardPanel::kHeatGap);
 constexpr int pianoY = keyboardLabelY + KeyboardPanel::kLabelH;
-constexpr int referenceY = referencePixel (888);
-const juce::Point<float> speedC { referenceUnits (1075), referenceUnits (217) },
-                         sustainC { referenceUnits (1238), referenceUnits (255) },
-                         amountC { referenceUnits (1191), referenceUnits (442) };
+constexpr int referenceY = referencePixel (930);
+constexpr float stagePosition (int y)
+{
+    return referenceUnits (55) + referenceUnits (y - 55) * float (stageBottom - 55) / (602.0f - 55.0f);
+}
+juce::Point<float> stagePoint (int x, int y) { return { referenceUnits (x), stagePosition (y) }; }
+
+const auto speedC = stagePoint (1075, 217);
+const auto sustainC = stagePoint (1238, 255);
+const auto amountC = stagePoint (1191, 442);
 constexpr float speedR = referenceUnits (122), sustainR = referenceUnits (73), amountR = referenceUnits (110);
 constexpr float speedBand = 0.78f;            // Speed knob: proportion where the aggressive (< 0 ms) band starts
-juce::Point<float> referencePoint (int x, int y) { return { referenceUnits (x), referenceUnits (y) }; }
-
-juce::Rectangle<float> referenceRect (int x, int y, int w, int h)
+juce::Rectangle<float> modeRect (int x, int y, int w, int h)
 {
-    return { referenceUnits (x), referenceUnits (y), referenceUnits (w), referenceUnits (h) };
+    constexpr float scale = float (modeBottom - stageBottom) / (655.0f - 602.0f);
+    return { referenceUnits (x), referenceUnits (stageBottom) + referenceUnits (y - 602) * scale,
+             referenceUnits (w), referenceUnits (h) * scale };
 }
 
-const auto noteBounds = referenceRect (180, 610, 114, 34);
-const auto majorBounds = referenceRect (308, 610, 81, 34);
-const auto majorHoldBounds = referenceRect (389, 610, 73, 34);
-const auto minorBounds = referenceRect (475, 610, 81, 34);
-const auto minorHoldBounds = referenceRect (556, 610, 73, 34);
-const auto timingBounds = referenceRect (698, 605, 354, 43);
-const auto stabilizerBounds = referenceRect (1066, 610, 162, 34);
-const auto latencyTrack = referenceRect (1258, 616, 45, 21);
-const auto latencyCaption = referenceRect (1327, 609, 76, 39);
+const auto noteBounds = modeRect (180, 610, 114, 34);
+const auto majorBounds = modeRect (308, 610, 81, 34);
+const auto majorHoldBounds = modeRect (389, 610, 73, 34);
+const auto minorBounds = modeRect (475, 610, 81, 34);
+const auto minorHoldBounds = modeRect (556, 610, 73, 34);
+const auto timingBounds = modeRect (698, 605, 354, 43);
+const auto stabilizerBounds = modeRect (1066, 610, 162, 34);
+const auto latencyTrack = modeRect (1258, 616, 45, 21);
+const auto latencyCaption = modeRect (1327, 609, 76, 39);
 
 juce::Image makeConcretePanel()
 {
@@ -57,8 +64,8 @@ juce::Image makeConcretePanel()
     auto texture = juce::Image (juce::Image::RGB, MetaTuneEditor::kW, rowY, true);
     juce::Image::BitmapData pixels (texture, juce::Image::BitmapData::writeOnly);
     juce::Random grain (0x434f4e43);
-    const auto origin = referencePoint (750, 60);
-    const auto end = referencePoint (1407, 598);
+    const auto origin = stagePoint (750, 60);
+    const auto end = stagePoint (1407, 598);
     const auto shadow = [] (juce::Point<float> p, juce::Point<float> centre, float radius, float offset, float softness)
     {
         const auto delta = p - centre.translated (1.0f, offset);
@@ -94,10 +101,10 @@ juce::Image makeConcretePanel()
 juce::Path panelEdge()
 {
     juce::Path edge;
-    edge.startNewSubPath (referencePoint (741, 55));
-    edge.cubicTo (referencePoint (779, 55), referencePoint (789, 66), referencePoint (807, 100));
-    edge.lineTo (referencePoint (1026, 500));
-    edge.cubicTo (referencePoint (1061, 564), referencePoint (1104, 596), referencePoint (1154, 602));
+    edge.startNewSubPath (stagePoint (741, 55));
+    edge.cubicTo (stagePoint (779, 55), stagePoint (789, 66), stagePoint (807, 100));
+    edge.lineTo (stagePoint (1026, 500));
+    edge.cubicTo (stagePoint (1061, 564), stagePoint (1104, 596), stagePoint (1154, 602));
     return edge;
 }
 
@@ -135,7 +142,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     : AudioProcessorEditor (p), proc (p), state (p.apvts),
       speedKnob ("Speed", formatSpeed, { -210.0f, 60.0f, true, 3, layout::speedBand, "ms", 0.077f }),
       sustainKnob ("Sustain", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -135.0f, 135.0f, false, 4, -1.0f, "%", 0.0f, true, true, true }),
-      amountKnob ("Amount", [] (double v) { return juce::String (juce::roundToInt (v)); }, { -225.0f, 49.0f, true, 3, -1.0f, "%" }),
+      amountKnob ("Amount", [] (double v) { return v >= 99.95 ? juce::String ("100") : juce::String (v, 1); }, { -225.0f, 49.0f, true, 3, -1.0f, "%" }),
       orb (*state.getParameter (ParamID::doublerWidth), *state.getParameter (ParamID::doublerMix), "Doubler\nWidth", "Doubler\nDry / Wet", &p.undoManager),
       stabilizerSeg (*state.getParameter (ParamID::stabilizer), { "None", "Short", "Mid", "Long" }, &p.undoManager)
 {
@@ -158,7 +165,8 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
                                                             &stabilizerSeg, &groups, &presetBar, &notePill, &majorPill, &minorPill, &majorHoldPill,
                                                             &minorHoldPill, &lowLatency, &colorButton, &menuButton, &saveButton, &undoButton, &redoButton,
                                                             &aButton, &copyButton, &bButton, &helpButton, &heatButton,
-                                                            &detectedButton, &bypassButton, &chromaticButton })
+                                                            &detectedButton, &heatResetButton, &detectedResetButton,
+                                                            &bypassButton, &chromaticButton })
         canvas.addAndMakeVisible (c);
     canvas.addChildComponent (rootPicker);
     canvas.addChildComponent (presetPanel);
@@ -201,12 +209,6 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     if (update::Settings::notesVersion() != JucePlugin_VersionString)
         showNotesPending = true; // a version change (install/update): show "What's New" once the UI is laid out
     saveCard.onSave = [this] (const juce::String& n) {
-        if (pendingSave == PendingSave::GroupName)
-        {
-            MetaTuneProcessor::setGroupName (pendingGroup, n.trim());
-            saveCard.setVisible (false);
-            return;
-        }
         const bool folder = pendingSave == PendingSave::Folder;
         if (n.trim().isEmpty()) { saveCard.open ({}, folder ? "Type a folder name" : "Type a name first"); return; }
         const bool ok = folder ? proc.createFolder (n) : proc.savePreset (n, pendingFolder);
@@ -218,13 +220,17 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     presetPanel.onSaveToFolder = [this] (const juce::String& f) { showBrowser (false); pendingSave = PendingSave::Preset; pendingFolder = f; saveCard.open (proc.ui.presetName); };
     presetPanel.onNewFolder = [this] { showBrowser (false); pendingSave = PendingSave::Folder; pendingFolder = {}; saveCard.open ({}); };
     presetPanel.onDelete = [this] (int i) { proc.deletePreset (i); refreshPresetPanel(); };
-    presetPanel.onHeightChanged = [this] {
-        using namespace layout;
-        const int x = 54, y = headerH + 2, w = 288, th = 26;
-        const int maxH = rowY - (y + th) - 10;
-        if (presetPanel.isVisible())
-            presetPanel.setBounds (x, y + th, w, juce::jmin (presetPanel.preferredHeight(), maxH));
+    presetPanel.onToggleKeepScale = [this]
+    {
+        proc.ui.keepScale = ! proc.ui.keepScale;
+        syncModeButtons();
     };
+    presetPanel.onToggleTiming = [this]
+    {
+        lowLatency.setToggleState (! lowLatency.getToggleState(), juce::sendNotificationSync);
+        syncModeButtons();
+    };
+
     presetPanel.onToggleFavorite = [this] (int i) {
         const auto list = proc.presetList();
         if (juce::isPositiveAndBelow (i, int (list.size())))
@@ -242,11 +248,28 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
         folder.createDirectory();
         folder.startAsProcess();
     };
-    presetPanel.onMouseLeave = nullptr; // the tabbed browser closes on a click outside, not on mouse-leave
+
     canvas.addMouseListener (this, true);
-    rootPicker.onRoot = [this] (int pc) { pickerPinned = false; setRoot (pc); };
-    rootPicker.onScale = [this] (int i) { pickerPinned = false; applyPickedScale (i); };
-    rootPicker.onFlats = [this] (bool f) { proc.ui.useFlats = f; canvas.repaint(); };
+    rootPicker.onRoot = [this] (int pc) {
+        pickerPinned = false;
+        if (state.getRawParameterValue (ParamID::scale)->load() == float (metatune::ScaleType::Chromatic))
+        {
+            proc.ui.scaleLabel = {};
+            proc.undoManager.beginNewTransaction ("Set key");
+            setParam (ParamID::root, float (pc));
+            setParam (ParamID::scale, float (metatune::ScaleType::Major));
+        }
+        else
+            setRoot (pc);
+        setPianoMode (0);
+    };
+    rootPicker.onScale = [this] (int i) { pickerPinned = false; applyPickedScale (i); setPianoMode (0); };
+    rootPicker.onFlats = [this] (bool f) {
+        proc.ui.useFlats = f;
+        keyboard.setUseFlats (f);
+        syncRootPickerState();
+        canvas.repaint();
+    };
     rootPicker.onClose = [this] { pickerPinned = false; };
     // Open/close is driven by the pointer poll in timerCallback (transform-safe, unlike mouse enter/exit
     // under a scaled canvas), so the panel's own leave handler stays out of it.
@@ -272,7 +295,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     refAttach = std::make_unique<SA> (state, ParamID::referenceHz, refStrip);
     toneAttach = std::make_unique<SA> (state, ParamID::toneVolume, toneSlider);
     bypassButton.setClickingTogglesState (true);
-    bypassButton.onColour = theme::pink;
+    bypassButton.onColour = theme::bypassAccent;
     bypassAttach = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, ParamID::bypass, bypassButton);
     speedKnob.setDoubleClickReturnValue (true, 20.0);
     sustainKnob.setDoubleClickReturnValue (true, 0.0);
@@ -282,16 +305,22 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
 
     keyboard.onToggleNote = [this] (int pc) { keyClicked (pc); };
     keyboard.onSetRoot = [this] (int pc) { setRoot (pc); };
-    // Holding a key plays the reference tone (C4..B4) at Tone Volume.
-    keyboard.onPress = [this] (int pc) { proc.toneChord = toneChordMode; proc.toneNote = 60 + pc; };
-    keyboard.onRelease = [this] { proc.toneNote = -1; };
+    // Holding a note label plays its reference tone or chord at Tone Volume.
+    keyboard.onPress = [this] (int pc) { proc.toneChord = pianoMode(); proc.toneNote = 60 + pc; };
+    keyboard.onRelease = [this] { proc.toneNote = -1; finishPianoChoice(); };
 
     undoButton.onClick = [this] { proc.undoManager.undo(); };
     redoButton.onClick = [this] { proc.undoManager.redo(); };
     aButton.onClick = [this] { if (proc.getABSlot() != 0) proc.switchAB(); };
     bButton.onClick = [this] { if (proc.getABSlot() != 1) proc.switchAB(); };
     copyButton.onClick = [this] { proc.copyToOtherAB(); };
-    menuButton.onClick = [this] { showSettingsPanel (! settingsPanel.isVisible()); };
+    menuButton.onModifiedClick = [this] (const juce::ModifierKeys& modifiers)
+    {
+        if (modifiers.isPopupMenu() || modifiers.isShiftDown())
+            showSettingsPanel (! settingsPanel.isVisible());
+        else
+            showBrowser (! browserTabs.isVisible());
+    };
     colorButton.onClick = [this] { showColorPanel (! colorPanel.isVisible()); };
     colorButton.iconScale = 0.66f;
     menuButton.iconScale = 0.44f;
@@ -309,6 +338,11 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     helpButton.iconOffset.y = -0.7f;
     helpButton.idleColour = juce::Colour (0xffcccccc);
     heatButton.captionInset = detectedButton.captionInset = 67.0f;
+    heatButton.iconOffset.x = detectedButton.iconOffset.x = -1.0f;
+    heatResetButton.iconScale = detectedResetButton.iconScale = 0.52f;
+    heatResetButton.idleColour = detectedResetButton.idleColour = juce::Colour (0xffd3d3d3);
+    heatButton.setTitle ("Show Heat Maps");
+    detectedButton.setTitle ("Show Detected Notes");
     bypassButton.captionInset = 61.0f;
     bypassButton.iconOffset.x = 6.7f;
     bypassButton.idleColour = juce::Colour (0xfff1f0f0);
@@ -316,7 +350,8 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     chromaticButton.iconOffset.x = 22.5f;
     chromaticButton.idleColour = juce::Colour (0xffd5d5d5);
     for (auto* button : { &colorButton, &menuButton, &saveButton, &undoButton, &redoButton, &copyButton,
-                          &helpButton, &heatButton, &detectedButton, &bypassButton, &chromaticButton })
+                          &helpButton, &heatButton, &detectedButton, &heatResetButton, &detectedResetButton,
+                          &bypassButton, &chromaticButton })
         button->useFilledIcons = true;
     colorPanel.onChange = [this] (float h, float s, float b) {
         theme::setGradient (false, theme::gradA, theme::gradB); // a solid accent cancels the gradient
@@ -346,53 +381,36 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     };
     colorButton.setTooltip ("Colour: recolour MetaTune's accent (hue, saturation, brightness) or pick a preset swatch.");
     saveButton.onClick = [this] { savePresetDialog(); };
-    // The header preset box opens a presets-only list (no Groups tab); the grid/box icon opens the tabbed browser.
-    presetBar.onClick = [this] { showPresetPanel (browserTabs.isVisible() || ! presetPanel.isVisible()); };
+    presetBar.onClick = [this] { showPresetPanel (! browserTabs.isVisible() || browserTabs.getTab() != 0); };
     presetBar.onPrev = [this] { stepPreset (-1); };
     presetBar.onNext = [this] { stepPreset (+1); };
 
-    notePill.onClick = [this] {
-        proc.ui.majorHold = proc.ui.minorHold = false;
-        toneChordMode = 0;
-        selectNoteMode();
-    };
-    majorPill.onClick = [this] {
-        proc.ui.minorHold = false;
-        toneChordMode = 1;
-        selectScale (metatune::ScaleType::Major);
-    };
-    minorPill.onClick = [this] {
-        proc.ui.majorHold = false;
-        toneChordMode = 2;
-        selectScale (metatune::ScaleType::Minor);
-    };
-    auto setHold = [this] (bool major) {
-        auto& hold = major ? proc.ui.majorHold : proc.ui.minorHold;
-        auto& other = major ? proc.ui.minorHold : proc.ui.majorHold;
-        hold = ! hold;
-        other = false;
-        if (hold)
-        {
-            toneChordMode = major ? 1 : 2;
-            selectScale (major ? metatune::ScaleType::Major : metatune::ScaleType::Minor);
-        }
-        syncModeButtons();
-    };
-    majorHoldPill.onClick = [setHold] { setHold (true); };
-    minorHoldPill.onClick = [setHold] { setHold (false); };
-    chromaticButton.onClick = [this] {
-        proc.ui.majorHold = proc.ui.minorHold = false;
-        toneChordMode = 0;
-        selectScale (metatune::ScaleType::Chromatic);
-    };
+    notePill.onClick = [this] { setPianoMode (0); };
+    majorPill.onClick = [this] { setPianoMode (1, proc.ui.majorHold); };
+    minorPill.onClick = [this] { setPianoMode (2, proc.ui.minorHold); };
+    majorHoldPill.onClick = [this] { setPianoMode (proc.ui.majorHold ? 0 : 1, ! proc.ui.majorHold); };
+    minorHoldPill.onClick = [this] { setPianoMode (proc.ui.minorHold ? 0 : 2, ! proc.ui.minorHold); };
+    chromaticButton.onClick = [this] { toggleChromatic(); };
     lowLatency.onClick = [this] { proc.undoManager.beginNewTransaction ("Low Latency"); setParam (ParamID::range, lowLatency.getToggleState() ? 2.0f : 0.0f); };
 
     groups.setSelected (proc.ui.group);
-    groups.onSelect = [this] (int g) { proc.joinGroup (g); groups.setSelected (proc.getGroup()); };
-    groups.onBrowse = [this] { showBrowser (! browserTabs.isVisible()); };
-    groupBrowser.onAssign = [this] (int id, int grp) { MetaTuneProcessor::setInstanceGroup (id, grp); refreshGroupBrowser(); };
-    groupBrowser.onRename = [this] (int grp) { showBrowser (false); pendingSave = PendingSave::GroupName; pendingGroup = grp; saveCard.open (MetaTuneProcessor::groupName (grp)); };
-    groupBrowser.onMouseLeave = nullptr;
+    groups.onSelect = [this] (int group)
+    {
+        proc.joinGroup (group);
+        groups.setSelected (proc.getGroup());
+        if (groupBrowser.isVisible()) refreshGroupBrowser();
+    };
+    groups.onBrowse = [this] { showGroupBrowser (! browserTabs.isVisible() || browserTabs.getTab() != 1); };
+    groupBrowser.onAssign = [this] (int id, int group)
+    {
+        MetaTuneProcessor::setInstanceGroup (id, group);
+        refreshGroupBrowser();
+    };
+    groupBrowser.onRename = [this] (int group, const juce::String& name)
+    {
+        MetaTuneProcessor::setGroupName (group, name);
+        refreshGroupBrowser();
+    };
 
     for (auto* b : { &helpButton, &heatButton, &detectedButton })
         b->setClickingTogglesState (true);
@@ -404,6 +422,8 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     helpButton.onClick = [this] { proc.ui.tooltips = helpButton.getToggleState(); updateTooltips(); };
     heatButton.onClick = [this] { proc.ui.heatmaps = heatButton.getToggleState(); keyboard.setShowHeat (proc.ui.heatmaps); canvas.repaint(); };
     detectedButton.onClick = [this] { proc.ui.detectedNotes = detectedButton.getToggleState(); keyboard.setShowDetected (proc.ui.detectedNotes); };
+    heatResetButton.onClick = [this] { keyboard.resetHeat(); };
+    detectedResetButton.onClick = [this] { keyboard.resetDetected(); };
     keyboard.setShowHeat (proc.ui.heatmaps);
     keyboard.setShowDetected (proc.ui.detectedNotes);
 
@@ -428,7 +448,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     minorHoldPill.setTooltip ("Set the root of a minor scale by clicking a piano key.");
     stabilizerSeg.setTooltip ("Note Stabilizer: how long a new note must hold before the tuner moves to it (Short 40 ms, Mid 80 ms, Long 200 ms). Stops quick passing notes from being snapped.");
     refStrip.setTooltip ("Reference tuning for A4. Drag, Shift-drag for fine, double-click for 440 Hz.");
-    toneSlider.setTooltip ("Volume of the tone generator: hold a key on the keyboard to hear that note.");
+    toneSlider.setTooltip ("Volume of the tone generator: hold a note label to audition a note or chord.");
     groups.setTooltip ("Groups: copies of the plugin in the same group share their settings. The small number shows how many copies are in each group. Click your group again to leave it.");
     presetBar.setTooltip ("Presets: click for the list, arrows step through them. Presets keep your key and scale.");
     chromaticButton.setTooltip ("Switch to the chromatic scale (all notes allowed).");
@@ -439,9 +459,11 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     copyButton.setTooltip ("Copy the current snapshot to the other one");
     helpButton.setTooltip ("Show/hide tooltips");
     heatButton.setTooltip ("Show/hide the input and output overlays");
-    detectedButton.setTooltip ("Show/hide detected input note and output target on the keyboard");
+    detectedButton.setTooltip ("Show/hide detected output pitches on the keyboard");
+    heatResetButton.setTooltip ("Clear the input and output Heat Maps");
+    detectedResetButton.setTooltip ("Clear the detected output notes");
     bypassButton.setTooltip ("Bypass all processing (latency stays compensated)");
-    menuButton.setTooltip ("Settings");
+    menuButton.setTooltip ("Presets and groups. Shift-click or right-click for settings.");
     saveButton.setTooltip ("Save the current settings as a preset");
 
     syncModeButtons();
@@ -450,6 +472,7 @@ MetaTuneEditor::MetaTuneEditor (MetaTuneProcessor& p)
     getConstrainer()->setFixedAspectRatio (double (referenceW) / referenceH);
     setResizeLimits (kW * 6 / 10, kH * 6 / 10, kW * 3 / 2, kH * 3 / 2);
     setSize (juce::roundToInt (kW * proc.ui.scale), heightForWidth (kW * proc.ui.scale));
+    updateBypassAppearance (bypassButton.getToggleState(), juce::Time::getMillisecondCounterHiRes());
     startTimerHz (60);
 }
 
@@ -509,7 +532,7 @@ void MetaTuneEditor::layout()
 
     // Stage.
     groups.setBounds (0, referencePixel (123), referencePixel (74), referencePixel (440));
-    orb.setBounds (61, 34, 606, 430);
+    orb.setBounds (65, 32, 606, 466);
     speedKnob.setBounds (around (speedC, speedR));
     sustainKnob.setBounds (around (sustainC, sustainR));
     amountKnob.setBounds (around (amountC, amountR));
@@ -530,8 +553,10 @@ void MetaTuneEditor::layout()
     chromaticButton.setBounds (0, chromaticY, leftW, footerY - chromaticY);
     heatButton.setBounds (rightX + 6, bottomY, kW - rightX - 10, keyboardLabelY - bottomY);
     detectedButton.setBounds (rightX + 6, keyboardLabelY, kW - rightX - 10, pianoY - keyboardLabelY);
+    heatResetButton.setBounds (heatButton.getBounds().withX (heatButton.getX() + 30).withWidth (28));
+    detectedResetButton.setBounds (detectedButton.getBounds().withX (detectedButton.getX() + 30).withWidth (28));
     bypassButton.setBounds (rightX + 12, pianoY, kW - rightX - 18, referenceY - pianoY);
-    refStrip.setBounds (rightX + 13, referenceY + 42, kW - rightX - 22, 47);
+    refStrip.setBounds (rightX + 13, referenceY + 29, kW - rightX - 22, 45);
     // (the picker's bounds are driven every frame by updatePicker)
 }
 
@@ -570,7 +595,12 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
         if (e.titleTexture.isNull())
         {
             e.titleTexture = juce::Image (juce::Image::RGB, title.getWidth(), title.getHeight(), false);
+            e.bypassTitleTexture = juce::Image (juce::Image::RGB, title.getWidth(), title.getHeight(), false);
             juce::Image::BitmapData pixels (e.titleTexture, juce::Image::BitmapData::writeOnly);
+            juce::Image::BitmapData bypassPixels (e.bypassTitleTexture, juce::Image::BitmapData::writeOnly);
+            const auto titleBase = lightMode ? headerBox : juce::Colour (0xff242426);
+            const auto titleAccent = lightMode ? bg3 : juce::Colour (0xff4d4072);
+            const auto bypassTitleAccent = lightMode ? juce::Colour (0xfff2c6c4) : juce::Colour (0xff42292b);
             for (int y = 0; y < pixels.height; ++y)
                 for (int x = 0; x < pixels.width; ++x)
                 {
@@ -579,14 +609,22 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
                     const float wave = std::sin (float (x) * 0.041f + float (y) * 0.12f + 0.85f * cloud);
                     const float envelope = juce::jmin (1.0f, 6.2f * juce::jmin (u, 1.0f - u));
                     const float level = envelope * (0.64f + 0.13f * cloud + 0.14f * wave);
-                    pixels.setPixelColour (x, y, lightMode ? headerBox.interpolatedWith (bg3, level)
-                                                           : juce::Colour (0xff242426).interpolatedWith (juce::Colour (0xff4d4072), level));
+                    pixels.setPixelColour (x, y, titleBase.interpolatedWith (titleAccent, level));
+                    bypassPixels.setPixelColour (x, y, titleBase.interpolatedWith (bypassTitleAccent, level));
                 }
         }
         g.drawImageAt (e.titleTexture, title.getX(), title.getY());
+        if (e.bypassBlend > 0.0f)
+        {
+            g.setOpacity (e.bypassBlend);
+            g.drawImageAt (e.bypassTitleTexture, title.getX(), title.getY());
+            g.setOpacity (1.0f);
+        }
         g.setColour (juce::Colours::black.withAlpha (0.45f));
         g.fillPath (wordmark(), juce::AffineTransform::translation (0.0f, 0.7f));
-        g.setColour (lightMode ? text : juce::Colour (0xfffaf8fc));
+        const auto normalWordmark = lightMode ? text : juce::Colour (0xfffaf8fc);
+        const auto bypassWordmark = lightMode ? juce::Colour (0xffa44747) : theme::bypassAccent;
+        g.setColour (normalWordmark.interpolatedWith (bypassWordmark, e.bypassBlend));
         g.fillPath (wordmark());
     }
     g.setColour (juce::Colours::black.withAlpha (0.72f));
@@ -712,16 +750,17 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
         g.fillRect (103, bottomY + e.keyboard.heatOutputY() + KeyboardPanel::kHeatH / 2, 19, 1);
     }
     shadowText (g, "Tone Volume", juce::Rectangle<float> (0.0f, float (keyboardLabelY + 8), float (leftW), 22.0f), juce::Justification::centred, text.withAlpha (0.9f));
-    shadowText (g, "Pitch Reference", juce::Rectangle<float> (float (rightX), float (referenceY + 8), float (kW - rightX), 25.0f), juce::Justification::centred, text.withAlpha (0.9f));
+    shadowText (g, "Pitch Reference", juce::Rectangle<float> (float (rightX), float (referenceY + 3), float (kW - rightX), 24.0f), juce::Justification::centred, text.withAlpha (0.9f));
 
     const int root = juce::jlimit (0, 11, int (e.state.getRawParameterValue (ParamID::root)->load()));
     static const char* flatNames[] { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" };
     const juce::String name = e.proc.ui.useFlats ? flatNames[root] : kNoteNames[root];
     g.setColour (text);
+    const float rootScale = float (e.rootArea.getHeight()) / 136.0f;
     if (! e.proc.ui.scaleEverSet)
     {
         // First run only (no key ever picked): a mouse cursor and a prompt instead of a key.
-        const auto area = e.rootArea.withHeight (100).toFloat();
+        const auto area = e.rootArea.toFloat();
         const juce::Colour promptCol = textDim.interpolatedWith (text, 0.4f); // adapts to the theme
         juce::Path cur;
         cur.startNewSubPath (0.0f, 0.0f);
@@ -732,34 +771,34 @@ void MetaTuneEditor::Canvas::paint (juce::Graphics& g)
         cur.lineTo (6.7f, 11.0f);
         cur.lineTo (12.5f, 11.0f);
         cur.closeSubPath();
-        const auto curBox = juce::Rectangle<float> (31.0f, 39.0f).withCentre ({ area.getCentreX(), float (e.rootArea.getY()) + 28.0f });
+        const auto curBox = juce::Rectangle<float> (31.0f * rootScale, 39.0f * rootScale).withCentre ({ area.getCentreX(), area.getY() + 32.0f * rootScale });
         const auto curXform = cur.getTransformToScaleToFit (curBox, true);
         g.setColour (juce::Colours::black.withAlpha (0.5f)); // shadow
         g.fillPath (cur, curXform.followedBy (juce::AffineTransform::translation (0.0f, 1.6f)));
         g.setColour (promptCol);
         g.fillPath (cur, curXform);
         g.setFont (font (18.0f, true));
-        shadowFittedText (g, "Hover to\nset scale", e.rootArea.withTrimmedTop (66).withHeight (56), juce::Justification::centredTop, 2, promptCol);
+        shadowFittedText (g, "Hover to\nset scale", e.rootArea.withTrimmedTop (juce::roundToInt (58.0f * rootScale)), juce::Justification::centredTop, 2, promptCol);
     }
     else
     {
         const auto letter = name.substring (0, 1);
         const auto accidental = name.endsWithChar ('b') ? juce::String::charToString (0x266d) : name.substring (1);
-        const auto letterFont = font (83.5f, true).withHorizontalScale (0.96f), accidentalFont = font (63.0f);
+        const auto letterFont = font (83.5f * rootScale, true).withHorizontalScale (0.96f), accidentalFont = font (63.0f * rootScale);
         const float letterWidth = juce::GlyphArrangement::getStringWidth (letterFont, letter);
         const float accidentalWidth = juce::GlyphArrangement::getStringWidth (accidentalFont, accidental);
-        const auto area = e.rootArea.toFloat().withTrimmedTop (12.0f).withHeight (83.0f);
+        const auto area = e.rootArea.toFloat().withTrimmedTop (12.0f * rootScale).withHeight (83.0f * rootScale);
         const float x = area.getCentreX() + 2.8f - (letterWidth + accidentalWidth) * 0.5f;
         g.setFont (letterFont);
         shadowText (g, letter, area.withX (x).withWidth (letterWidth + 1.0f), juce::Justification::centredLeft, text);
         if (accidental.isNotEmpty())
         {
             g.setFont (accidentalFont);
-            shadowText (g, accidental, area.withX (x + letterWidth).withWidth (accidentalWidth + 2.0f).translated (0.0f, -12.8f),
+            shadowText (g, accidental, area.withX (x + letterWidth).withWidth (accidentalWidth + 2.0f).translated (0.0f, -12.8f * rootScale),
                         juce::Justification::centredLeft, text);
         }
-        g.setFont (font (23.5f, true));
-        shadowText (g, e.scaleDisplayName(), e.rootArea.withTrimmedTop (94).withHeight (26).toFloat().translated (2.8f, 0.0f),
+        g.setFont (font (23.5f * rootScale, true));
+        shadowText (g, e.scaleDisplayName(), e.rootArea.toFloat().withTrimmedTop (94.0f * rootScale).withHeight (26.0f * rootScale).translated (2.8f, 0.0f),
                     juce::Justification::centred, text, 0.9f, 0.48f);
     }
 
@@ -781,18 +820,40 @@ void MetaTuneEditor::syncModeButtons()
     const auto scale = metatune::ScaleType (juce::jlimit (0, 3, int (state.getRawParameterValue (ParamID::scale)->load())));
     chromaticButton.onColour = theme::lavender;
     chromaticButton.setToggleState (scale == metatune::ScaleType::Chromatic, juce::dontSendNotification);
-    notePill.setToggleState (! proc.ui.majorHold && ! proc.ui.minorHold, juce::dontSendNotification);
-    majorPill.setToggleState (scale == metatune::ScaleType::Major, juce::dontSendNotification);
-    minorPill.setToggleState (scale == metatune::ScaleType::Minor, juce::dontSendNotification);
+    const int mode = pianoMode();
+    keyboard.setAuditionMode (mode);
+    notePill.setToggleState (mode == 0, juce::dontSendNotification);
+    majorPill.setToggleState (mode == 1, juce::dontSendNotification);
+    minorPill.setToggleState (mode == 2, juce::dontSendNotification);
     majorHoldPill.setToggleState (proc.ui.majorHold, juce::dontSendNotification);
     minorHoldPill.setToggleState (proc.ui.minorHold, juce::dontSendNotification);
     const bool lowLatencyOn = int (state.getRawParameterValue (ParamID::range)->load()) == 2;
     const bool warmTiming = ! lowLatencyOn && state.getRawParameterValue (ParamID::stabilizer)->load() > 0.0f;
     lowLatency.setToggleState (lowLatencyOn, juce::dontSendNotification);
     lowLatency.setWarmAccent (warmTiming);
+    presetPanel.setModeOptions (proc.ui.keepScale, lowLatencyOn, warmTiming);
     if (stabilizerSeg.usesWarmAccent() != warmTiming)
         canvas.repaint (layout::stabilizerBounds.getSmallestIntegerContainer());
     stabilizerSeg.setWarmAccent (warmTiming);
+}
+
+void MetaTuneEditor::updateBypassAppearance (bool bypassed, double now)
+{
+    constexpr double fadeMs = 180.0;
+    const float step = lastBypassFrameMs < 0.0 ? 1.0f
+        : static_cast<float> (juce::jlimit (0.0, 1.0, (now - lastBypassFrameMs) / fadeMs));
+    lastBypassFrameMs = now;
+    const float next = juce::jlimit (0.0f, 1.0f, bypassBlend + (bypassed ? step : -step));
+    if (next == bypassBlend)
+        return;
+
+    bypassBlend = next;
+    speedKnob.setBypassBlend (next);
+    sustainKnob.setBypassBlend (next);
+    amountKnob.setBypassBlend (next);
+    groups.setBypassBlend (next);
+    keyboard.setBypassBlend (next);
+    canvas.repaint (juce::Rectangle<int> (389, 0, 400, layout::headerH));
 }
 
 void MetaTuneEditor::timerCallback()
@@ -818,24 +879,37 @@ void MetaTuneEditor::timerCallback()
     while (proc.telemetry.pop (t))
     {
         latestRms = t.rms;
+        latestSustainRatio = t.sustainTimeRatio;
         if (t.inputMidi > 0 && t.confidence >= 0.7f)
         {
             const float out = bypassed ? t.inputMidi : t.outputMidi;
             keyboard.addHeat (t.inputMidi, out, t.confidence * juce::jmin (1.0f, t.rms * 8.0f) * 0.35f);
             display.inputMidi = t.inputMidi;
-            display.outputMidi = out;
-            display.target = bypassed ? -1 : t.target;
+            display.outputMidi = t.outputMidi;
+            display.target = t.target;
             lastVoicedMs = now;
         }
     }
-    keyboard.decayHeat (0.975f);
+    if (bypassed)
+    {
+        display.outputMidi = display.inputMidi;
+        display.target = -1;
+    }
+    keyboard.decayHeat (0.91f);
     display.voiced = now - lastVoicedMs < 80.0;
     display.presence += display.voiced ? (1.0f - display.presence) * 0.35f : -display.presence * 0.10f;
     const float lvl = juce::jlimit (0.0f, 1.0f, (juce::Decibels::gainToDecibels (latestRms, -100.0f) + 50.0f) / 40.0f);
     display.level += (lvl - display.level) * 0.25f;
 
-    orb.setDisplay (display, bypassed);
-    speedKnob.setActivity (bypassed ? 0.0f : display.presence * (0.35f + 0.65f * display.level));
+    updateBypassAppearance (bypassed, now);
+    orb.setDisplay (display, state.getRawParameterValue (ParamID::speed)->load(), bypassBlend);
+    speedKnob.setActivity (display.presence * (0.35f + 0.65f * display.level));
+    const float sustain = state.getRawParameterValue (ParamID::sustain)->load() * 0.01f;
+    speedKnob.setSustainDisplay (sustain, display.voiced && display.target >= 0 ? latestSustainRatio : 1.0f);
+    heatButton.setToggleState (proc.ui.heatmaps, juce::dontSendNotification);
+    detectedButton.setToggleState (proc.ui.detectedNotes, juce::dontSendNotification);
+    keyboard.setShowHeat (proc.ui.heatmaps);
+    keyboard.setShowDetected (proc.ui.detectedNotes);
     keyboard.setDisplay (display);
     keyboard.setMask (proc.currentMask());
     keyboard.setUseFlats (proc.ui.useFlats);
@@ -857,8 +931,6 @@ void MetaTuneEditor::timerCallback()
         autoKeyCard.setState (inst, inst && st.live && st.valid(), st.root, st.minor);
     }
     syncModeButtons();
-    if (rootPicker.isVisible())
-        syncRootPickerState();
 
     undoButton.setEnabled (proc.undoManager.canUndo());
     redoButton.setEnabled (proc.undoManager.canRedo());
@@ -914,17 +986,67 @@ void MetaTuneEditor::selectNoteMode()
     }
 }
 
+int MetaTuneEditor::pianoMode() const
+{
+    if (proc.ui.majorHold) return 1;
+    if (proc.ui.minorHold) return 2;
+    return toneChordMode;
+}
+
+void MetaTuneEditor::setPianoMode (int mode, bool hold)
+{
+    toneChordMode = hold ? 0 : mode;
+    proc.ui.majorHold = hold && mode == 1;
+    proc.ui.minorHold = hold && mode == 2;
+    syncModeButtons();
+}
+
+void MetaTuneEditor::finishPianoChoice()
+{
+    if (! proc.ui.majorHold && ! proc.ui.minorHold)
+        setPianoMode (0);
+}
+
+void MetaTuneEditor::toggleChromatic()
+{
+    using metatune::ScaleType;
+    setPianoMode (0);
+    const auto type = ScaleType (int (state.getRawParameterValue (ParamID::scale)->load()));
+    auto& scaleBeforeChromatic = proc.ui.scaleBeforeChromatic;
+    if (type != ScaleType::Chromatic)
+    {
+        const auto root = int (state.getRawParameterValue (ParamID::root)->load());
+        scaleBeforeChromatic = MetaTuneProcessor::UiSettings::SavedScale { type, root, proc.currentMask(), proc.ui.scaleLabel };
+        selectScale (ScaleType::Chromatic);
+    }
+    else if (scaleBeforeChromatic)
+    {
+        const auto& saved = *scaleBeforeChromatic;
+        proc.undoManager.beginNewTransaction ("Restore scale");
+        setParam (ParamID::root, float (saved.root));
+        if (saved.type == ScaleType::Custom)
+            for (int pc = 0; pc < 12; ++pc)
+                setParam (ParamID::note (pc), metatune::isAllowed (saved.mask, pc) ? 1.0f : 0.0f);
+        proc.ui.scaleLabel = saved.label;
+        setParam (ParamID::scale, float (saved.type));
+        scaleBeforeChromatic.reset();
+    }
+    syncModeButtons();
+}
+
 void MetaTuneEditor::keyClicked (int pc)
 {
-    if (proc.ui.majorHold || proc.ui.minorHold)
+    const int mode = pianoMode();
+    if (mode == 0)
     {
-        proc.undoManager.beginNewTransaction ("Set key");
-        proc.ui.scaleLabel = {};
-        setParam (ParamID::scale, float (proc.ui.majorHold ? metatune::ScaleType::Major : metatune::ScaleType::Minor));
-        setParam (ParamID::root, float (pc));
+        toggleNote (pc);
         return;
     }
-    toggleNote (pc);
+    proc.undoManager.beginNewTransaction ("Set key");
+    proc.ui.scaleLabel = {};
+    setParam (ParamID::root, float (pc));
+    setParam (ParamID::scale, float (mode == 1 ? metatune::ScaleType::Major : metatune::ScaleType::Minor));
+    finishPianoChoice();
 }
 
 void MetaTuneEditor::toggleNote (int pc)
@@ -963,7 +1085,7 @@ void MetaTuneEditor::syncRootPickerState()
     int idx = RootPicker::scaleNames().indexOf (proc.ui.scaleLabel, true);
     if (sc == metatune::ScaleType::Major) idx = 0;
     if (sc == metatune::ScaleType::Minor) idx = 1;
-    if (sc == metatune::ScaleType::Chromatic) idx = RootPicker::scaleNames().indexOf ("Chromatic");
+    if (sc == metatune::ScaleType::Chromatic) idx = 0;
     if (sc == metatune::ScaleType::Custom && proc.ui.scaleLabel.isEmpty()) idx = RootPicker::scaleNames().indexOf ("Custom");
     rootPicker.setState (int (state.getRawParameterValue (ParamID::root)->load()), idx, proc.ui.useFlats);
 }
@@ -998,20 +1120,23 @@ void MetaTuneEditor::updatePicker()
         rootPicker.setVisible (false);
 
     if (rootPicker.isVisible())
+    {
         rootPicker.setBounds (area.withX (juce::roundToInt (float (offX) * (1.0f - pickerSlide))));
+        syncRootPickerState();
+    }
+    const auto point = rootPicker.getLocalPoint (&canvas, mp.toFloat());
+    keyboard.setPreviewMask (over && rootPicker.isVisible() && rootPicker.getLocalBounds().toFloat().contains (point)
+                                 ? pickerPreview (point) : std::nullopt);
 }
 
 void MetaTuneEditor::mouseDown (const juce::MouseEvent& e)
 {
     if (browserTabs.isVisible() && e.eventComponent != &presetPanel && e.eventComponent != &groupBrowser
         && e.eventComponent != &browserTabs && e.eventComponent != &presetBar && e.eventComponent != &groups
+        && e.eventComponent != &menuButton
         && ! presetPanel.isParentOf (e.eventComponent) && ! groupBrowser.isParentOf (e.eventComponent))
         showBrowser (false);
-    // Standalone presets-only panel (opened from the header preset box): close it on an outside click.
-    if (presetPanel.isVisible() && ! browserTabs.isVisible()
-        && e.eventComponent != &presetPanel && e.eventComponent != &presetBar
-        && ! presetPanel.isParentOf (e.eventComponent))
-        showPresetPanel (false);
+
     if (settingsPanel.isVisible() && e.eventComponent != &settingsPanel && e.eventComponent != &menuButton)
         showSettingsPanel (false);
     if (colorPanel.isVisible() && e.eventComponent != &colorPanel && e.eventComponent != &colorButton)
@@ -1031,97 +1156,101 @@ juce::String MetaTuneEditor::scaleDisplayName() const
     return juce::String (kScaleNames[scale]).toLowerCase();
 }
 
+static metatune::PitchClassMask drawerScaleMask (int index, int root)
+{
+    using namespace metatune;
+    constexpr PitchClassMask masks[] {
+        kMajorFromC, kMinorFromC,
+        0x0295, 0x04a9, // major and minor pentatonic
+        0x09b5, 0x09ad  // harmonic major and harmonic minor
+    };
+    return transposeMask (masks[index], root);
+}
+
+std::optional<metatune::PitchClassMask> MetaTuneEditor::pickerPreview (juce::Point<float> point) const
+{
+    using metatune::ScaleType;
+    const int root = int (state.getRawParameterValue (ParamID::root)->load());
+    const auto type = ScaleType (int (state.getRawParameterValue (ParamID::scale)->load()));
+    if (const int pitch = rootPicker.rootAt (point); pitch >= 0)
+        return type == ScaleType::Chromatic ? drawerScaleMask (0, pitch)
+                                            : metatune::transposeMask (proc.currentMask(), pitch - root);
+    if (const int index = rootPicker.scaleAt (point); index >= 0 && index < 6)
+        return drawerScaleMask (index, root);
+    return std::nullopt;
+}
+
 void MetaTuneEditor::applyPickedScale (int index)
 {
-    const auto name = RootPicker::scaleNames()[index];
-    if (name == "Major") { selectScale (metatune::ScaleType::Major); return; }
-    if (name == "Minor") { selectScale (metatune::ScaleType::Minor); return; }
-    if (name == "Custom") { selectNoteMode(); return; }
-    if (name == "Chromatic") { selectScale (metatune::ScaleType::Chromatic); return; }
-    // Other scales become a Custom note set on the current root.
-    static const std::map<juce::String, std::vector<int>> intervals {
-        { "Pent Maj", { 0, 2, 4, 7, 9 } }, { "Pent Min", { 0, 3, 5, 7, 10 } },
-        { "Harm Maj", { 0, 2, 4, 5, 7, 8, 11 } }, { "Harm Min", { 0, 2, 3, 5, 7, 8, 11 } } };
-    const auto it = intervals.find (name);
-    if (it == intervals.end()) return;
-    const int root = int (state.getRawParameterValue (ParamID::root)->load());
-    bool on[12] {};
-    for (int iv : it->second) on[(root + iv) % 12] = true;
+    using metatune::ScaleType;
+    if (index == 0) { selectScale (ScaleType::Major); return; }
+    if (index == 1) { selectScale (ScaleType::Minor); return; }
+    if (index == 6) { selectNoteMode(); return; }
+    if (! juce::isPositiveAndBelow (index, 6)) return;
+
+    const auto mask = drawerScaleMask (index, int (state.getRawParameterValue (ParamID::root)->load()));
     proc.undoManager.beginNewTransaction ("Scale");
-    for (int i = 0; i < 12; ++i)
-        setParam (ParamID::note (i), on[i] ? 1.0f : 0.0f);
-    setParam (ParamID::scale, float (metatune::ScaleType::Custom));
-    proc.ui.scaleLabel = name;
+    for (int pc = 0; pc < 12; ++pc)
+        setParam (ParamID::note (pc), metatune::isAllowed (mask, pc) ? 1.0f : 0.0f);
+    setParam (ParamID::scale, float (ScaleType::Custom));
+    proc.ui.scaleLabel = RootPicker::scaleNames()[index];
 }
 
 void MetaTuneEditor::showBrowser (bool show, int tab)
 {
-    using namespace layout;
+    constexpr int x = 53, y = 56, width = 188, tabHeight = 32;
+    constexpr int tuckedOffset = -(x + width);
+    const juce::Rectangle<int> tabsOpen (x, y, width, tabHeight);
+    const juce::Rectangle<int> bodyOpen (x, y + tabHeight, width, layout::rowY - y - tabHeight);
     auto& animator = juce::Desktop::getInstance().getAnimator();
-    if (tab >= 0) browserTabs.setTab (tab);
-    const int x = 54, y = headerH + 2, w = 288, th = 26;
 
     if (! show)
     {
-        if (browserTabs.isVisible())
+        if (! browserTabs.isVisible()) return;
+        for (auto* component : std::array<juce::Component*, 3> { &browserTabs, &presetPanel, &groupBrowser })
         {
-            animator.animateComponent (&browserTabs, browserTabs.getBounds().translated (-22, 0), 0.0f, 130, true, 1.0, 1.0);
-            if (presetPanel.isVisible()) animator.animateComponent (&presetPanel, presetPanel.getBounds().translated (-22, 0), 0.0f, 130, true, 1.0, 1.0);
-            if (groupBrowser.isVisible()) animator.animateComponent (&groupBrowser, groupBrowser.getBounds().translated (-22, 0), 0.0f, 130, true, 1.0, 1.0);
+            if (! component->isVisible()) continue;
+            animator.cancelAnimation (component, false);
+            animator.animateComponent (component, component->getBounds().withX (-width), 0.0f, 170, true, 1.0, 1.0);
+            component->setVisible (false);
         }
-        browserTabs.setVisible (false);
-        presetPanel.setVisible (false);
-        groupBrowser.setVisible (false);
         groups.setBrowseActive (false);
+        menuButton.setIcon (icons::menu());
         return;
     }
+
     showSettingsPanel (false);
     showColorPanel (false);
-    groups.setBrowseActive (true);
-
     const bool wasOpen = browserTabs.isVisible();
-    const juce::Rectangle<int> tabsOpen (x, y, w, th);
-    if (! wasOpen)
-    {
-        browserTabs.setBounds (tabsOpen.translated (-28, 0));
-        browserTabs.setAlpha (0.0f);
-        browserTabs.setVisible (true);
-        browserTabs.toFront (false);
-        animator.animateComponent (&browserTabs, tabsOpen, 1.0f, 190, false, 0.0, 0.0);
-    }
-    else
-    {
-        animator.cancelAnimation (&browserTabs, false);
-        browserTabs.setBounds (tabsOpen);
-        browserTabs.setAlpha (1.0f);
-        browserTabs.setVisible (true);
-        browserTabs.toFront (false);
-    }
+    if (tab >= 0) browserTabs.setTab (tab);
+    const bool showingGroups = browserTabs.getTab() == 1;
+    auto& body = showingGroups ? static_cast<juce::Component&> (groupBrowser) : static_cast<juce::Component&> (presetPanel);
+    auto& other = showingGroups ? static_cast<juce::Component&> (presetPanel) : static_cast<juce::Component&> (groupBrowser);
+    animator.cancelAnimation (&other, false);
+    other.setVisible (false);
 
-    const int maxH = rowY - (y + th) - 10;
-    auto slideIn = [&] (juce::Component& c, int ph)
+    if (showingGroups) refreshGroupBrowser();
+    else refreshPresetPanel();
+    groups.setBrowseActive (showingGroups);
+    juce::Path drawerIcon;
+    drawerIcon.addRoundedRectangle (0.0f, 0.0f, 20.0f, 5.0f, 1.0f);
+    drawerIcon.addRoundedRectangle (0.0f, 7.0f, 8.0f, 12.0f, 0.9f);
+    drawerIcon.addRoundedRectangle (10.0f, 7.0f, 10.0f, 12.0f, 0.9f);
+    menuButton.setIcon (std::move (drawerIcon));
+
+    const auto reveal = [&] (juce::Component& component, juce::Rectangle<int> open)
     {
-        const juce::Rectangle<int> open (x, y + th, w, juce::jmin (ph, maxH));
-        animator.cancelAnimation (&c, false);
-        c.setBounds (open.translated (-28, 0));
-        c.setAlpha (0.0f);
-        c.setVisible (true);
-        c.toFront (false);
-        animator.animateComponent (&c, open, 1.0f, 190, false, 0.0, 0.0);
+        animator.cancelAnimation (&component, false);
+        component.setBounds (wasOpen ? open : open.translated (tuckedOffset, 0));
+        component.setAlpha (1.0f);
+        component.setVisible (true);
+        component.toFront (false);
+        if (! wasOpen)
+            animator.animateComponent (&component, open, 1.0f, 200, false, 1.0, 0.0);
     };
-
-    if (browserTabs.getTab() == 0)
-    {
-        refreshPresetPanel();
-        slideIn (presetPanel, presetPanel.preferredHeight());
-        groupBrowser.setVisible (false);
-    }
-    else
-    {
-        refreshGroupBrowser();
-        slideIn (groupBrowser, groupBrowser.preferredHeight());
-        presetPanel.setVisible (false);
-    }
+    reveal (browserTabs, tabsOpen);
+    reveal (body, bodyOpen);
+    groups.toFront (false);
 }
 
 void MetaTuneEditor::showAutoKey()
@@ -1153,6 +1282,7 @@ void MetaTuneEditor::repaintAll()
     lnf.setColour (juce::PopupMenu::highlightedTextColourId, theme::text);
     brushed = {};
     titleTexture = {};
+    bypassTitleTexture = {};
     canvas.repaint();
 }
 
@@ -1171,7 +1301,6 @@ void MetaTuneEditor::showColorPanel (bool show)
                               update::Settings::orbHue(), update::Settings::keyHue(), update::Settings::meterHue());
         showSettingsPanel (false);
         showBrowser (false);
-        showPresetPanel (false);
         colorPanel.setBounds (tucked);
         colorPanel.setAlpha (0.0f);
         colorPanel.setVisible (true);
@@ -1223,7 +1352,6 @@ void MetaTuneEditor::showSettingsPanel (bool show)
     if (show)
     {
         showBrowser (false);
-        showPresetPanel (false);
         settingsPanel.setBounds (tucked);
         settingsPanel.setAlpha (0.0f);
         settingsPanel.setVisible (true);
@@ -1264,31 +1392,7 @@ void MetaTuneEditor::installUpdate()
 
 void MetaTuneEditor::showPresetPanel (bool show)
 {
-    auto& animator = juce::Desktop::getInstance().getAnimator();
-    if (show == presetPanel.isVisible() && ! animator.isAnimating (&presetPanel))
-        return;
-    refreshPresetPanel();
-    const int h = juce::jmin (presetPanel.preferredHeight(), layout::rowY - layout::headerH - 12);
-    const juce::Rectangle<int> open (113, layout::headerH + 2, 287, h), tucked = open.translated (0, -12);
-    if (show)
-    {
-        showSettingsPanel (false);
-        showColorPanel (false);
-        browserTabs.setVisible (false);   // presets-only: no Groups tab
-        groupBrowser.setVisible (false);
-        groups.setBrowseActive (false);
-        presetPanel.setBounds (tucked);
-        presetPanel.setAlpha (0.0f);
-        presetPanel.setVisible (true);
-        presetPanel.toFront (false);
-        animator.animateComponent (&presetPanel, open, 1.0f, 170, false, 0.0, 0.0);
-    }
-    else
-    {
-        animator.animateComponent (&presetPanel, tucked, 0.0f, 130, true, 1.0, 1.0);
-        presetPanel.setVisible (false);
-        browserTabs.setVisible (false);
-    }
+    showBrowser (show, show ? 0 : -1);
 }
 
 void MetaTuneEditor::stepPreset (int delta)
@@ -1310,10 +1414,19 @@ void MetaTuneEditor::savePresetDialog()
 
 void MetaTuneEditor::refreshPresetPanel()
 {
+    const auto factoryFolder = [] (const juce::String& name)
+    {
+        if (name == "Hard Tune" || name == "Trap Lead") return "01. Hip-Hop";
+        if (name == "Natural Pop" || name == "Wide Doubles") return "02. Pop & Electronic";
+        if (name == "Smooth Ballad" || name == "Subtle Polish") return "03. Natural Tuning";
+        return "04. Signature";
+    };
     std::vector<PresetItem> items;
-    for (const auto& e : proc.presetList())
-        items.push_back ({ e.name, e.folder, e.factory, update::Settings::isFavorite (e.folder, e.name) });
-    presetPanel.setItems (items, proc.ui.presetName);
+    for (const auto& entry : proc.presetList())
+        items.push_back ({ entry.name, entry.factory ? juce::String (factoryFolder (entry.name)) : entry.folder,
+                           entry.factory, update::Settings::isFavorite (entry.folder, entry.name) });
+    presetPanel.setItems (items, proc.presetFolders(), proc.ui.presetName);
+    syncModeButtons();
 }
 
 void MetaTuneEditor::refreshGroupBrowser()
@@ -1323,7 +1436,7 @@ void MetaTuneEditor::refreshGroupBrowser()
     std::vector<GroupInstanceRow> rows;
     for (const auto& inf : proc.groupInstances())
         rows.push_back ({ inf.id, inf.group,
-                          inf.preset.isNotEmpty() ? inf.preset : "Instance " + juce::String (inf.id),
+                          inf.label.isNotEmpty() ? inf.label : "Instance " + juce::String (inf.id),
                           inf.id == proc.instanceId });
     groupBrowser.setData (names, rows);
 }
@@ -1331,9 +1444,8 @@ void MetaTuneEditor::refreshGroupBrowser()
 void MetaTuneEditor::showNotesCard()
 {
     update::Settings::setNotesVersion (JucePlugin_VersionString);
-    showPresetPanel (false);
+    showBrowser (false);
     showSettingsPanel (false);
-    showGroupBrowser (false);
     notesCard.setVisible (false); // keep the overlay out of its own backdrop snapshot
     auto snap = canvas.createComponentSnapshot (canvas.getLocalBounds());
     if (snap.isValid())
@@ -1351,27 +1463,7 @@ void MetaTuneEditor::showNotesCard()
 
 void MetaTuneEditor::showGroupBrowser (bool show)
 {
-    auto& animator = juce::Desktop::getInstance().getAnimator();
-    if (show == groupBrowser.isVisible() && ! animator.isAnimating (&groupBrowser)) return;
-    if (show)
-    {
-        refreshGroupBrowser();
-        const int h = juce::jmin (groupBrowser.preferredHeight(), layout::rowY - 134);
-        const juce::Rectangle<int> open (54, 124, 272, h), tucked = open.translated (-12, 0);
-        showPresetPanel (false);
-        showSettingsPanel (false);
-        groupBrowser.setBounds (tucked);
-        groupBrowser.setAlpha (0.0f);
-        groupBrowser.setVisible (true);
-        groupBrowser.toFront (false);
-        animator.animateComponent (&groupBrowser, open, 1.0f, 170, false, 0.0, 0.0);
-    }
-    else
-    {
-        animator.animateComponent (&groupBrowser, groupBrowser.getBounds().translated (-12, 0), 0.0f, 130, true, 1.0, 1.0);
-        groupBrowser.setVisible (false);
-        browserTabs.setVisible (false);
-    }
+    showBrowser (show, show ? 1 : -1);
 }
 
 void MetaTuneEditor::setScale (float s)

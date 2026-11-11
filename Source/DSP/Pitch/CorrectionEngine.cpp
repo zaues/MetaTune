@@ -21,6 +21,7 @@ void CorrectionEngine::reset() noexcept
 {
     selector.reset();
     desired = c = inMidi = noteAge = 0;
+    sustainRatio = 1.0;
     active = false;
     target = TargetSelector::kNoTarget;
 }
@@ -70,10 +71,12 @@ void CorrectionEngine::onEstimate (const PitchEstimate& e) noexcept
     // Sustain on held notes (only meaningful for positive Speed): positive shortens the time
     // constant (held notes retune faster), negative lengthens it (held notes retune slower).
     alpha = baseAlpha;
+    sustainRatio = 1.0;
     if (p.sustain != 0 && p.speedMs > 0 && noteAge > kSustainOnsetS)
     {
         const double ramp = std::min (1.0, (noteAge - kSustainOnsetS) / kSustainRampS);
-        alpha = onePoleAlpha (p.speedMs / 1000.0 * (1.0 - 0.97 * p.sustain * ramp), sr);
+        sustainRatio = 1.0 - 0.97 * p.sustain * ramp;
+        alpha = onePoleAlpha (p.speedMs / 1000.0 * sustainRatio, sr);
     }
     desired = active ? (target - inMidi) * p.amount : 0.0;
 }

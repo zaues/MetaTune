@@ -117,12 +117,18 @@ void MetaTuneProcessor::setGroup (int group)
     groupSynced = linkedValues();
 }
 
+void MetaTuneProcessor::updateTrackProperties (const TrackProperties& properties)
+{
+    const juce::ScopedLock sl (GroupHub::get().lock);
+    trackName = properties.name.value_or (juce::String {});
+}
+
 std::vector<MetaTuneProcessor::GroupInstanceInfo> MetaTuneProcessor::groupInstances() const
 {
     const juce::ScopedLock sl (GroupHub::get().lock);
     std::vector<GroupInstanceInfo> out;
     for (auto* m : GroupHub::get().members)
-        out.push_back ({ m->instanceId, m->ui.group, m->ui.presetName });
+        out.push_back ({ m->instanceId, m->ui.group, m->trackName.isNotEmpty() ? m->trackName : m->ui.presetName });
     std::sort (out.begin(), out.end(), [] (const GroupInstanceInfo& a, const GroupInstanceInfo& b) { return a.id < b.id; });
     return out;
 }
@@ -218,6 +224,7 @@ double MetaTuneProcessor::latencyMsFor (int rangeIndex) const noexcept
 
 void MetaTuneProcessor::resetAllParameters()
 {
+    ui.scaleBeforeChromatic.reset();
     undoManager.beginNewTransaction ("Reset All");
     for (auto* p : getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*> (p); rp != nullptr && p != bypassParam)
@@ -427,6 +434,15 @@ void MetaTuneProcessor::getStateInformation (juce::MemoryBlock& dest)
     u->setAttribute ("preset", ui.presetName);
     u->setAttribute ("keepScale", ui.keepScale);
     u->setAttribute ("scaleSet", ui.scaleEverSet);
+    if (ui.scaleBeforeChromatic && pScale->load() == float (metatune::ScaleType::Chromatic))
+    {
+        const auto& saved = *ui.scaleBeforeChromatic;
+        auto* previous = u->createNewChildElement ("BeforeChromatic");
+        previous->setAttribute ("type", int (saved.type));
+        previous->setAttribute ("root", saved.root);
+        previous->setAttribute ("mask", int (saved.mask));
+        previous->setAttribute ("label", saved.label);
+    }
     copyXmlToBinary (root, dest);
 }
 
@@ -451,6 +467,7 @@ void MetaTuneProcessor::setStateInformation (const void* data, int size)
                     abSnapshot[i] = juce::ValueTree::fromXml (*snap);
         }
     }
+    ui.scaleBeforeChromatic.reset();
     if (const auto* u = xml->getChildByName ("UI"))
     {
         ui.heatmaps = u->getBoolAttribute ("heatmaps", true);
@@ -465,6 +482,16 @@ void MetaTuneProcessor::setStateInformation (const void* data, int size)
         ui.majorHold = u->getBoolAttribute ("majorHold", false);
         ui.minorHold = u->getBoolAttribute ("minorHold", false);
         ui.group = juce::jlimit (-1, 3, u->getIntAttribute ("group", -1));
+        if (const auto* previous = u->getChildByName ("BeforeChromatic"))
+        {
+            const int type = previous->getIntAttribute ("type");
+            if (type >= int (metatune::ScaleType::Major) && type <= int (metatune::ScaleType::Custom))
+                ui.scaleBeforeChromatic = UiSettings::SavedScale {
+                    metatune::ScaleType (type), juce::jlimit (0, 11, previous->getIntAttribute ("root")),
+                    metatune::PitchClassMask (previous->getIntAttribute ("mask") & metatune::kAllNotes),
+                    previous->getStringAttribute ("label")
+                };
+        }
         groupSynced = linkedValues(); // a loaded project keeps its own settings
     }
     // Migration / safety: a project that already has a non-default key or scale has clearly been used,

@@ -4,23 +4,29 @@
 #include "../DSP/Pitch/Scale.h"
 #include <array>
 #include <functional>
+#include <optional>
 
 // Input/Output HeatMaps + note label row + one-octave piano, all sharing one pitch-class x axis
-// (12 equal cells, cell centre = note). Shows the allowed-note mask, root, detected input note and
-// output target. Click a note to toggle it; right-click a note to make it the root.
+// Shows the allowed-note mask, detected input note and output target. The label row auditions
+// pitches; the piano bodies edit the scale. Right-click either row to make a note the root.
 class KeyboardPanel : public juce::Component, public juce::SettableTooltipClient
 {
 public:
-    static constexpr int kHeatTop = 1, kHeatH = 19, kHeatGap = 2, kLabelH = 62;
+    static constexpr int kHeatTop = 1, kHeatH = 21, kHeatGap = 2, kLabelH = 62;
     static constexpr int kBins = 480; // heat resolution: 2.5 cents per bin
 
     std::function<void (int pitchClass)> onToggleNote, onSetRoot;
-    std::function<void (int pitchClass)> onPress; // left button down on a key (reference tone on)
-    std::function<void()> onRelease;              // button up (reference tone off)
+    std::function<void (int pitchClass)> onPress; // press a label to audition
+    std::function<void()> onRelease;              // release the audition
 
     void setMask (metatune::PitchClassMask m) { if (m != mask) { mask = m; repaint(); } }
-    void setShowHeat (bool b) { showHeat = b; repaint(); }
-    void setShowDetected (bool b) { showDetected = b; repaint(); }
+    void setPreviewMask (std::optional<metatune::PitchClassMask>);
+    void setAuditionMode (int mode) { auditionMode = mode; }
+    void setBypassBlend (float blend);
+    void setShowHeat (bool b) { if (b != showHeat) { showHeat = b; repaint(); } }
+    void setShowDetected (bool b) { if (b != showDetected) { showDetected = b; repaint(); } }
+    void resetHeat();
+    void resetDetected();
     void setUseFlats (bool b) { if (b != useFlats) { useFlats = b; repaint(); } }
     void addHeat (float inputMidi, float outputMidi, float weight); // per telemetry sample
     void decayHeat (float factor);                                  // per frame
@@ -31,9 +37,10 @@ public:
 
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
-    void mouseUp (const juce::MouseEvent&) override { if (onRelease) onRelease(); }
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseEnter (const juce::MouseEvent& e) override { mouseMove (e); }
     void mouseMove (const juce::MouseEvent&) override;
-    void mouseExit (const juce::MouseEvent&) override { if (hoverPc >= 0) keyHover[size_t (hoverPc)]->setTarget (0.0f); hoverPc = -1; }
+    void mouseExit (const juce::MouseEvent&) override;
 
 private:
     int pitchClassAt (juce::Point<float>) const;
@@ -42,13 +49,25 @@ private:
     juce::Rectangle<float> piano() const;
     juce::Rectangle<float> keyRect (int pc) const;
     juce::Path blackKeyShape (juce::Rectangle<float>) const;
-    void drawHeat (juce::Graphics&, juce::Rectangle<int>, const std::array<float, kBins>&, juce::Image&) const;
+    void setHoveredKey (int pc, bool label);
+    void drawKeyOutline (juce::Graphics&, const juce::Path&, int pc, juce::Colour) const;
+    struct HeatHistory
+    {
+        std::array<float, kBins> total {}, recent {};
+        void add (float position, float weight, float width);
+    };
+    void drawHeat (juce::Graphics&, juce::Rectangle<int>, const HeatHistory&, juce::Image&) const;
 
     metatune::PitchClassMask mask = metatune::kAllNotes;
-    int hoverPc = -1;
+    std::optional<metatune::PitchClassMask> previewMask;
+    metatune::PitchClassMask auditionMask = 0;
+    int hoverPc = -1, auditionMode = 0, pressedMode = 0;
+    bool hoverLabel = false, auditionPressed = false;
+    theme::Anim auditionGlow { *this, 0.25f };
+    float bypassBlend = 0.0f;
     bool showHeat = true, showDetected = true, useFlats = false;
-    float shimmer = 0; // idle animation clock for the light bars (advanced in decayHeat)
-    std::array<float, kBins> heatIn {}, heatOut {};
+    HeatHistory heatIn, heatOut;
+    std::array<float, 12> detectedHistory {};
     static constexpr int samplesPerBin = 3;
     juce::Image inputStrip { juce::Image::RGB, kBins * samplesPerBin, 1, false };
     juce::Image outputStrip { juce::Image::RGB, kBins * samplesPerBin, 1, false };

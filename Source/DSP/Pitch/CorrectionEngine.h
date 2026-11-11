@@ -44,6 +44,7 @@ public:
     double inputMidi() const noexcept { return inMidi; }    // 0 when unvoiced
     int targetNote() const noexcept { return target; }      // TargetSelector::kNoTarget when none
     double correctionSemitones() const noexcept { return c; }
+    double sustainTimeRatio() const noexcept { return sustainRatio; }
 
 private:
     void updateCoefficients() noexcept;
@@ -54,6 +55,7 @@ private:
     TargetSelector selector;
     double sr = 48000, alpha = 1, baseAlpha = 1, releaseAlpha = 1, noteAge = 0;
     double desired = 0, c = 0, inMidi = 0;
+    double sustainRatio = 1.0;
     bool active = false;
     int target = TargetSelector::kNoTarget;
 };
