@@ -96,8 +96,8 @@ public:
 
         // Header: wordmark + "Updater".
         juce::AttributedString word;
-        word.append (wordmarkA, font (20.0f), text.withAlpha (0.85f));
-        word.append (wordmarkB, font (20.0f, true), text);
+        word.append ("meta", font (20.0f), text.withAlpha (0.85f));
+        word.append ("Tune", font (20.0f, true), text);
         word.append ("  Updater", font (13.0f), textFaint);
         word.setJustification (juce::Justification::centredLeft);
         word.draw (g, { 22.0f, 14.0f, 300.0f, 28.0f });
