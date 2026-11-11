@@ -4,12 +4,11 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 // Central visualiser, built from independent layers (outside in):
-//  - atmosphere: a smoky glass sphere that breathes, with a reflection arc drifting over its upper edge;
-//  - orbit: a ring of fine ticks with a comet highlight running around it;
+//  - atmosphere: a smoky glass sphere with a pearlescent rim;
 //  - field: a thin violet ring with a slow pulse;
 //  - haze: a faint spinning particle band around the core;
 //  - core: an organic, wobbling contour (cyan -> white-lavender) around a swirling plum/teal sheen;
-//  - symbol: a crisp white bolt that only shows while a voice is detected, flickering with its level.
+//  - symbol: a pink-to-cyan bolt that only shows while a voice is detected, flickering with its level.
 // Voice activity speeds things up, brightens the core and makes its contour ripple harder.
 // The grey ball is an XY pad over the whole stage (Doubler): right = wider, up = more of the doubled voices.
 class Orb : public juce::Component, public juce::SettableTooltipClient
@@ -29,13 +28,12 @@ public:
     void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
-    static constexpr float kSphereR = 154.0f, kOrbitR = 140.0f, kFieldR = 124.0f; // layer radii (design units)
-    static constexpr float kCoreR = 64.0f;                       // mean radius of the core contour
-    static constexpr float kHazeR = 92.0f;                       // outer radius of the particle haze
+    static constexpr float kSphereR = 172.0f, kFieldR = 110.8f; // layer radii (design units)
+    static constexpr float kCoreR = 72.0f;                       // mean radius of the core contour
+    static constexpr float kHazeR = 96.0f;                       // outer radius of the particle haze
     float unit() const { return float (getHeight()) / 460.0f; } // layout unit: design height 460
     juce::Point<float> centre() const { return getLocalBounds().toFloat().getCentre(); }
     juce::Point<float> handlePos() const;
-    juce::Rectangle<float> padArea() const;
     juce::Rectangle<float> trackArea() const; // the reduced area the handle travels (stops short of the line ends)
     struct GuideGeom { float cornerX, baseY, topY, rightX, radius; }; // the visible L guide anchors
     GuideGeom guideGeom() const;

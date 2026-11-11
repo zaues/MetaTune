@@ -11,14 +11,14 @@
 class KeyboardPanel : public juce::Component, public juce::SettableTooltipClient
 {
 public:
-    static constexpr int kHeatTop = 3, kHeatH = 17, kHeatGap = 4, kLabelH = 64;
-    static constexpr int kBins = 240; // heat resolution: 5 cents per bin
+    static constexpr int kHeatTop = 1, kHeatH = 19, kHeatGap = 2, kLabelH = 62;
+    static constexpr int kBins = 480; // heat resolution: 2.5 cents per bin
 
     std::function<void (int pitchClass)> onToggleNote, onSetRoot;
     std::function<void (int pitchClass)> onPress; // left button down on a key (reference tone on)
     std::function<void()> onRelease;              // button up (reference tone off)
 
-    void setMask (metatune::PitchClassMask m, int root) { if (m != mask || root != rootPc) { mask = m; rootPc = root; repaint(); } }
+    void setMask (metatune::PitchClassMask m) { if (m != mask) { mask = m; repaint(); } }
     void setShowHeat (bool b) { showHeat = b; repaint(); }
     void setShowDetected (bool b) { showDetected = b; repaint(); }
     void setUseFlats (bool b) { if (b != useFlats) { useFlats = b; repaint(); } }
@@ -38,15 +38,20 @@ public:
 private:
     int pitchClassAt (juce::Point<float>) const;
     juce::Rectangle<float> labelRow() const;
+    juce::Rectangle<float> labelCell (int pc) const;
     juce::Rectangle<float> piano() const;
     juce::Rectangle<float> keyRect (int pc) const;
-    void drawHeat (juce::Graphics&, juce::Rectangle<float>, const std::array<float, kBins>&) const;
+    juce::Path blackKeyShape (juce::Rectangle<float>) const;
+    void drawHeat (juce::Graphics&, juce::Rectangle<int>, const std::array<float, kBins>&, juce::Image&) const;
 
     metatune::PitchClassMask mask = metatune::kAllNotes;
-    int rootPc = 0, hoverPc = -1;
+    int hoverPc = -1;
     bool showHeat = true, showDetected = true, useFlats = false;
     float shimmer = 0; // idle animation clock for the light bars (advanced in decayHeat)
     std::array<float, kBins> heatIn {}, heatOut {};
+    static constexpr int samplesPerBin = 3;
+    juce::Image inputStrip { juce::Image::RGB, kBins * samplesPerBin, 1, false };
+    juce::Image outputStrip { juce::Image::RGB, kBins * samplesPerBin, 1, false };
     std::array<std::unique_ptr<theme::Anim>, 12> keyHover { makeAnims() };
     std::array<std::unique_ptr<theme::Anim>, 12> makeAnims()
     {

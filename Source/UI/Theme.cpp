@@ -65,13 +65,34 @@ void setTheme (bool light)
         bg0 = juce::Colour (0xff0d0e10); bg1 = juce::Colour (0xff121316); bg2 = juce::Colour (0xff17181c);
         bg3 = juce::Colour (0xff24262d); line = juce::Colour (0xff2e3038);
         text = juce::Colour (0xfff2f1f7); textDim = juce::Colour (0xffa09eac); textFaint = juce::Colour (0xff5f5d6b);
-        header = juce::Colour (0xff17181c); headerBox = juce::Colour (0xff121316); stage = juce::Colour (0xff121316);
-        highlight = juce::Colour (0xff1e2026); panel = juce::Colour (0xff1e2026); knobBody = juce::Colour (0xff18191c);
-        menuBg = juce::Colour (0xff1c1c1e); menuBg2 = juce::Colour (0xff121213); menuSel = juce::Colour (0xff252528);
+        header = dark::toolbarBottom; headerBox = dark::toolbarCell; stage = dark::stage;
+        highlight = juce::Colour (0xff1e2026); panel = dark::graphite; knobBody = dark::knobFace;
+        menuBg = juce::Colour (0xff1c1c1e); menuBg2 = dark::rail; menuSel = juce::Colour (0xff252528);
         menuTab = juce::Colour (0xff232327); well = juce::Colour (0xff141416);
-        keyOffTop = juce::Colour (0xff8b8b8e); keyOffBottom = juce::Colour (0xff7c7c80); blackOff = juce::Colour (0xff262628);
-        labelWhite = juce::Colour (0xff5d5d60); labelBlack = juce::Colour (0xff19191a); greyText = juce::Colour (0xff7d808a);
+        keyOffTop = dark::labelWhite; keyOffBottom = dark::labelWhite.darker (0.06f); blackOff = dark::toolbarCell;
+        labelWhite = dark::labelWhite; labelBlack = dark::labelBlack; greyText = juce::Colour (0xff7d808a);
     }
+}
+
+float surfaceNoise (float x, float y) noexcept
+{
+    auto sample = [] (int col, int row)
+    {
+        auto hash = static_cast<juce::uint32> (col) * 0x9e3779b9u + static_cast<juce::uint32> (row) * 0x85ebca6bu;
+        hash = (hash ^ (hash >> 16)) * 0x7feb352du;
+        hash = (hash ^ (hash >> 15)) * 0x846ca68bu;
+        return float ((hash ^ (hash >> 16)) & 0xffffu) / 32767.5f - 1.0f;
+    };
+    auto layer = [&] (float spacing)
+    {
+        const float sx = x / spacing, sy = y / spacing;
+        const int ix = int (std::floor (sx)), iy = int (std::floor (sy));
+        auto smooth = [] (float v) { return v * v * (3.0f - 2.0f * v); };
+        const float dx = smooth (sx - float (ix)), dy = smooth (sy - float (iy));
+        return std::lerp (std::lerp (sample (ix, iy), sample (ix + 1, iy), dx),
+                          std::lerp (sample (ix, iy + 1), sample (ix + 1, iy + 1), dx), dy);
+    };
+    return 0.49f * layer (58.0f) + 0.29f * layer (17.0f) + 0.14f * layer (5.0f) + 0.08f * layer (1.0f);
 }
 
 juce::Font font (float height, bool semibold)
@@ -96,7 +117,7 @@ static int segmentsFor (juce::juce_wchar ch)
 
 static void drawDigit (juce::Graphics& g, int bits, juce::Rectangle<float> r, juce::Colour on, juce::Colour ghost)
 {
-    const float w = r.getWidth(), h = r.getHeight(), t = w * 0.19f, gap = t * 0.18f, ht = t * 0.5f;
+    const float w = r.getWidth(), h = r.getHeight(), t = w * 0.205f, gap = t * 0.18f, ht = t * 0.5f;
     const float x0 = r.getX(), y0 = r.getY();
     auto horiz = [&] (float y) {
         const float l = x0 + gap + ht, rr = x0 + w - gap - ht;
@@ -134,7 +155,7 @@ void drawSevenSeg (juce::Graphics& g, const juce::String& value, juce::Rectangle
     // Centred: draw just the value's digits, centred (no ghost padding). Otherwise: right-aligned in `cells`.
     const int n = centre ? glyphs.size() : cells;
     const int lead = centre ? 0 : juce::jmax (0, cells - glyphs.size());
-    const float h = area.getHeight(), dw = h * 0.50f, pitch = dw * 1.34f;
+    const float h = area.getHeight(), dw = h * 0.55f, pitch = dw * 1.31f;
     const float total = pitch * float (n) - (pitch - dw);
     float x = area.getCentreX() - total * 0.5f;
     for (int i = 0; i < n; ++i, x += pitch)

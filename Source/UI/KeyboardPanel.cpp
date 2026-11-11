@@ -11,6 +11,15 @@ juce::Rectangle<float> KeyboardPanel::labelRow() const
     return { 0.0f, y, float (getWidth()), float (kLabelH) };
 }
 
+juce::Rectangle<float> KeyboardPanel::labelCell (int pc) const
+{
+    // Seams measured along the label row, relative to the keyboard's left edge.
+    static constexpr int edges[] { 0, 88, 174, 263, 349, 435, 522, 609, 695, 780, 871, 957, 1043 };
+    const auto row = labelRow();
+    const float scale = row.getWidth() / float (edges[12]);
+    return row.withLeft (float (edges[pc]) * scale).withRight (float (edges[pc + 1]) * scale);
+}
+
 juce::Rectangle<float> KeyboardPanel::piano() const
 {
     const auto l = labelRow();
@@ -20,21 +29,45 @@ juce::Rectangle<float> KeyboardPanel::piano() const
 juce::Rectangle<float> KeyboardPanel::keyRect (int pc) const
 {
     const auto p = piano();
-    const float cell = p.getWidth() / 12.0f;
     if (isBlack (pc))
-        return { cell * float (pc), p.getY(), cell, p.getHeight() * 0.60f };
-    const float ww = p.getWidth() / 7.0f;
-    return { ww * float (whiteIndex (pc)), p.getY(), ww, p.getHeight() };
+        return labelCell (pc).withY (p.getY()).withHeight (p.getHeight() * 0.58f);
+    // Lower white-key seams measured at y=1015 on the 1415 px reference.
+    static constexpr int whiteEdges[] { 182, 332, 475, 617, 767, 924, 1078, 1225 };
+    const int i = whiteIndex (pc);
+    const float scale = p.getWidth() / float (whiteEdges[7] - whiteEdges[0]);
+    const float left = float (whiteEdges[i] - whiteEdges[0]) * scale;
+    const float width = float (whiteEdges[i + 1] - whiteEdges[i]) * scale;
+    return { left, p.getY(), width, p.getHeight() };
+}
+
+juce::Path KeyboardPanel::blackKeyShape (juce::Rectangle<float> r) const
+{
+    const float flare = r.getWidth() * 0.058f;
+    const float corner = r.getWidth() * 0.18f;
+    const float left = r.getX() - flare, right = r.getRight() + flare;
+    const float bottom = r.getBottom();
+    juce::Path p;
+    p.startNewSubPath (r.getX(), r.getY());
+    p.lineTo (r.getRight(), r.getY());
+    p.lineTo (right, bottom - corner);
+    p.quadraticTo (right + 0.6f, bottom, right - corner, bottom);
+    p.lineTo (left + corner, bottom);
+    p.quadraticTo (left - 0.6f, bottom, left, bottom - corner);
+    p.closeSubPath();
+    return p;
 }
 
 int KeyboardPanel::pitchClassAt (juce::Point<float> pt) const
 {
     if (labelRow().contains (pt))
-        return juce::jlimit (0, 11, int (pt.x / (float (getWidth()) / 12.0f)));
+    {
+        for (int pc = 0; pc < 12; ++pc)
+            if (labelCell (pc).contains (pt)) return pc;
+    }
     if (! piano().contains (pt))
         return -1;
     for (int pc = 0; pc < 12; ++pc) // black keys sit on top: test them first
-        if (isBlack (pc) && keyRect (pc).contains (pt)) return pc;
+        if (isBlack (pc) && blackKeyShape (keyRect (pc).reduced (1.0f, 0.0f)).contains (pt)) return pc;
     for (int pc = 0; pc < 12; ++pc)
         if (! isBlack (pc) && keyRect (pc).contains (pt)) return pc;
     return -1;
@@ -46,9 +79,9 @@ void KeyboardPanel::addHeat (float inMidi, float outMidi, float w)
         // Bin 0 is half a semitone below C, so each note's cell centre matches the label row.
         const float pos = std::fmod (midi + 0.5f, 12.0f) / 12.0f * float (kBins);
         const int c = int (pos);
-        for (int k = -4; k <= 4; ++k)
+        for (int k = -3; k <= 3; ++k)
         {
-            const float d = (float (c + k) + 0.5f - pos) / 1.6f;
+            const float d = (float (c + k) + 0.5f - pos) / 1.13f;
             h[size_t ((c + k + kBins) % kBins)] += w * std::exp (-d * d);
         }
     };
@@ -59,41 +92,73 @@ void KeyboardPanel::addHeat (float inMidi, float outMidi, float w)
 void KeyboardPanel::decayHeat (float f)
 {
     for (auto* h : { &heatIn, &heatOut })
-        for (auto& v : *h) v = v * f < 0.002f ? 0.0f : juce::jmin (4.0f, v * f);
+    {
+        const float decay = h == &heatIn ? std::sqrt (f) : std::pow (f, 0.82f);
+        for (auto& v : *h) v = v * decay < 0.002f ? 0.0f : juce::jmin (4.0f, v * decay);
+    }
     shimmer += 1.0f / 60.0f;
     if (shimmer > 3600.0f) shimmer -= 3600.0f;
     if (showHeat) repaint (0, 0, getWidth(), kHeatTop + 2 * kHeatH + kHeatGap);
 }
 
-void KeyboardPanel::drawHeat (juce::Graphics& g, juce::Rectangle<float> r, const std::array<float, kBins>& h) const
+void KeyboardPanel::drawHeat (juce::Graphics& g, juce::Rectangle<int> r,
+                              const std::array<float, kBins>& h, juce::Image& strip) const
 {
     using namespace theme;
-    g.setColour (bg0);
-    g.fillRect (r);
-    // Full-height violet streaks that turn white-hot where the voice dwells.
-    const float bw = r.getWidth() / float (kBins);
+    const auto ground = lightMode ? bg0 : dark::heatTrack;
+    const auto violetGlow = tint (recolour (juce::Colour (0xff750bff)), meterHue);
+    const auto whiteHot = juce::Colour (0xfffcf7ff);
+    const auto energyAt = [&] (int i) { return h[size_t ((i + kBins) % kBins)]; };
+
+    std::array<float, kBins> crests;
     for (int i = 0; i < kBins; ++i)
     {
-        // Idle shimmer: two slow interfering waves keep a very faint violet glow moving when nobody is singing.
-        const float idle = juce::jmax (0.0f, 0.06f + 0.05f * std::sin (float (i) * 0.37f + shimmer * 1.7f) * std::sin (float (i) * 0.11f - shimmer * 0.6f));
-        const float v = juce::jlimit (0.0f, 1.0f, juce::jmax (h[size_t (i)] * 0.3f, idle));
-        if (v <= 0.0f) continue;
-        const auto col = v < 0.6f ? violet.withAlpha (v / 0.6f) : violet.interpolatedWith (juce::Colours::white, (v - 0.6f) / 0.4f);
-        g.setColour (col);
-        g.fillRect (r.getX() + float (i) * bw, r.getY(), bw + 0.6f, r.getHeight());
+        const float energy = energyAt (i);
+        const float shoulder = (energyAt (i - 3) + energyAt (i + 3)) * 0.5f;
+        const float contrast = juce::jmax (0.0f, energy - shoulder);
+        crests[size_t (i)] = juce::jlimit (0.0f, 1.0f, (1.32f * contrast) / (contrast + 0.38f));
     }
+    const auto crestAt = [&] (int i) { return crests[size_t ((i + kBins) % kBins)]; };
+
+    // A one-pixel-high image gives every streak the full row height with sub-bin precision.
+    // Interpolate the live histogram and concentrate the white light at its local peaks.
+    {
+        juce::Image::BitmapData pixels (strip, juce::Image::BitmapData::writeOnly);
+        for (int i = 0; i < kBins; ++i)
+        {
+            const float energy = energyAt (i);
+            const float left = energyAt (i - 1), right = energyAt (i + 1);
+            const float peak = crestAt (i);
+            const float idle = 0.014f * (1.0f + std::sin (float (i) * 0.37f + shimmer * 1.7f)
+                                               * std::sin (float (i) * 0.11f - shimmer * 0.6f));
+            for (int s = 0; s < samplesPerBin; ++s)
+            {
+                const float offset = float (s - 1) / float (samplesPerBin);
+                const int side = offset < 0.0f ? -1 : 1;
+                const float fraction = std::abs (offset);
+                const float sample = std::lerp (energy, side < 0 ? left : right, fraction);
+                const float strength = sample / (sample + 0.43f);
+                const float core = std::lerp (peak, crestAt (i + side), fraction);
+                const float grain = 0.91f + 0.09f * std::sin ((float (i) + offset) * 2.38f);
+                const float brightness = juce::jlimit (0.0f, 1.0f, idle + 0.79f * strength * grain + 0.52f * core);
+                const float white = juce::jlimit (0.0f, 1.0f, (core - 0.32f) * 1.54f);
+                const auto light = violetGlow.interpolatedWith (whiteHot, white * white);
+                pixels.setPixelColour (i * samplesPerBin + s, 0, ground.interpolatedWith (light, brightness));
+            }
+        }
+    }
+    g.drawImage (strip, r.getX(), r.getY(), r.getWidth(), r.getHeight(), 0, 0, strip.getWidth(), 1);
 }
 
 void KeyboardPanel::paint (juce::Graphics& g)
 {
     using namespace theme;
-    const float W = float (getWidth());
-    g.fillAll (bg1);
+    g.fillAll (lightMode ? bg1 : dark::inset);
 
     if (showHeat)
     {
-        drawHeat (g, { 0.0f, float (heatInputY()), W, float (kHeatH) }, heatIn);
-        drawHeat (g, { 0.0f, float (heatOutputY()), W, float (kHeatH) }, heatOut);
+        drawHeat (g, { 0, heatInputY(), getWidth(), kHeatH }, heatIn, inputStrip);
+        drawHeat (g, { 0, heatOutputY(), getWidth(), kHeatH }, heatOut, outputStrip);
     }
 
     const bool live = state.voiced && state.presence > 0.05f;
@@ -101,63 +166,122 @@ void KeyboardPanel::paint (juce::Graphics& g)
     const int targetPc = live && state.target >= 0 ? state.target % 12 : -1;
 
     // Label row: the top of each key, grey over white keys and black over black keys.
-    const auto lr = labelRow();
-    const float cell = W / 12.0f;
     for (int pc = 0; pc < 12; ++pc)
     {
-        auto r = juce::Rectangle<float> (cell * float (pc), lr.getY(), cell, lr.getHeight()).reduced (1.0f, 0.0f);
-        const bool on = metatune::isAllowed (mask, pc);
-        // Allowed notes: lighter cell with a lavender line at the bottom; forbidden notes recede.
-        if (isBlack (pc)) g.setColour (on ? bg3 : labelBlack);
-        else              g.setColour (on ? labelWhite.brighter (0.12f) : bg3.darker (0.15f));
+        const auto r = labelCell (pc).reduced (0.65f, 0.0f);
+        const auto base = isBlack (pc) ? labelBlack : labelWhite;
+        const auto top = base.brighter (isBlack (pc) ? 0.025f : 0.065f);
+        g.setGradientFill (juce::ColourGradient (top, r.getTopLeft(), base, r.getBottomLeft(), false));
         g.fillRect (r);
-        if (pc == detectedPc && showDetected) // detected input note: the whole label lights up
-        {
-            g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.55f * state.presence), r.getX(), r.getY(),
-                                                     juce::Colours::white.withAlpha (0.15f * state.presence), r.getX(), r.getBottom(), false));
-            g.fillRect (r);
-        }
         if (const float h = keyHover[size_t (pc)]->get(); h > 0.0f)
         {
             g.setColour (juce::Colours::white.withAlpha (0.08f * h));
             g.fillRect (r);
         }
-        g.setFont (font (14.0f, true));
-        shadowText (g, (useFlats ? kFlatNames : kSharpNames)[pc], r, juce::Justification::centred, on ? text : text.withAlpha (0.45f));
-        if (on)
+        if (isBlack (pc) && metatune::isAllowed (mask, pc))
         {
-            g.setColour (lavender.withAlpha (0.9f));
-            g.fillRect (r.removeFromBottom (2.5f).reduced (3.0f, 0.0f));
+            g.setColour (tint (lavender, keyHue).withAlpha (0.45f));
+            g.fillRect (r.withTop (r.getBottom() - 1.15f).reduced (2.6f, 0.0f));
         }
+        if (pc == detectedPc && showDetected)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.82f * state.presence));
+            g.fillRect (r.withTop (r.getBottom() - 0.95f));
+        }
+        g.setFont (font (17.2f).withExtraKerningFactor (0.08f));
+        shadowText (g, (useFlats ? kFlatNames : kSharpNames)[pc], r, juce::Justification::centred,
+                    lightMode ? text : juce::Colour (0xffeeeeee), 0.55f, 0.22f);
     }
 
     // Piano: white keys, then black keys on top.
     auto drawKey = [&] (int pc) {
         const bool black = isBlack (pc);
-        const auto r = keyRect (pc).reduced (1.0f, 0.0f);
+        const auto r = keyRect (pc).reduced (0.68f, 0.0f);
         const bool on = metatune::isAllowed (mask, pc);
-        juce::Colour top, bottom;
-        if (black) { top = on ? tint (blackOnTop, keyHue) : blackOff; bottom = on ? tint (blackOnBottom, keyHue) : blackOff.darker (0.2f); }
-        else       { top = on ? tint (keyOnTop, keyHue) : keyOffTop; bottom = on ? tint (keyOnBottom, keyHue) : keyOffBottom; }
-        if (const float h = keyHover[size_t (pc)]->get(); h > 0.0f) { top = top.brighter (0.12f * h); bottom = bottom.brighter (0.12f * h); }
-        juce::Path p;
-        p.addRoundedRectangle (r.getX(), r.getY(), r.getWidth(), r.getHeight(), 3.0f, 3.0f, false, false, true, true);
-        if (black)
-            juce::DropShadow (juce::Colours::black.withAlpha (0.45f), 8, { 0, 3 }).drawForPath (g, p);
-        g.setGradientFill (juce::ColourGradient (top, r.getX(), r.getY(), bottom, r.getX(), r.getBottom(), false));
-        g.fillPath (p);
-        if (showDetected && pc == targetPc) // output target: glow + outline
+        const float hover = keyHover[size_t (pc)]->get();
+        auto top = black ? blackOff : keyOffTop;
+        auto bottom = black ? blackOff.darker (0.16f) : keyOffBottom;
+        if (on)
         {
-            g.setColour (juce::Colours::white.withAlpha (0.16f * state.presence));
-            g.fillPath (p);
-            g.setColour (lavender.withAlpha (state.presence));
-            g.strokePath (p, juce::PathStrokeType (2.0f));
+            top = tint (black ? blackOnTop : keyOnTop, keyHue);
+            bottom = tint (black ? blackOnBottom : keyOnBottom, keyHue);
+            if (! black && ! gradientOn) top = top.withMultipliedSaturation (1.055f);
         }
-        if (pc == rootPc) // root marker
+        else if (! black && ! lightMode)
         {
-            const float d = 6.0f;
-            g.setColour (black ? lavender : juce::Colours::white.withAlpha (0.85f));
-            g.fillEllipse (r.getCentreX() - d * 0.5f, r.getBottom() - d - 9.0f, d, d);
+            // The far right edge of the keyboard catches more light from the panel.
+            const float light = 0.11f * (float (pc) / 11.0f) * (float (pc) / 11.0f);
+            top = top.interpolatedWith (juce::Colours::white, light);
+            bottom = juce::Colour (0xff646464).interpolatedWith (juce::Colours::white, light * 0.48f);
+        }
+
+        juce::Path p;
+        if (black)
+        {
+            p = blackKeyShape (r);
+            juce::Graphics::ScopedSaveState clip (g);
+            g.reduceClipRegion (piano().getSmallestIntegerContainer());
+            const auto centre = juce::Point<float> (r.getRight() + 1.5f, r.getY() + r.getHeight() * 0.31f);
+            const float radius = 17.0f;
+            g.addTransform (juce::AffineTransform::scale (1.0f, 4.25f, centre.x, centre.y));
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (lightMode ? 0.16f : 0.31f), centre,
+                                                     juce::Colours::transparentBlack, centre.translated (radius, 0.0f), true));
+            g.fillEllipse (juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre));
+        }
+        else if (pc == 0 || pc == 11)
+            p.addRoundedRectangle (r.getX(), r.getY(), r.getWidth(), r.getHeight(),
+                                   pc == 0 ? 23.0f : 6.0f, pc == 0 ? 16.0f : 6.0f,
+                                   false, false, pc == 0, pc == 11);
+        else
+            p.addRectangle (r);
+
+        juce::ColourGradient surface (top.brighter (0.12f * hover), r.getTopLeft(),
+                                       bottom.brighter (0.12f * hover), r.getBottomLeft(), false);
+        if (on)
+        {
+            const auto bodyLight = tint (recolour (juce::Colour (black ? 0xff57458d : 0xffa080fa)), keyHue);
+            surface.addColour (black ? 0.34 : 0.45, gradientOn ? top.interpolatedWith (bottom, 0.25f) : bodyLight);
+        }
+        g.setGradientFill (surface);
+        g.fillPath (p);
+
+        if (black)
+        {
+            // The key narrows into the label above, and has a single rounded rim below.
+            g.setColour (juce::Colours::black.withAlpha (0.90f));
+            g.strokePath (p, juce::PathStrokeType (2.15f));
+        }
+        {
+            juce::Graphics::ScopedSaveState clip (g);
+            g.reduceClipRegion (p);
+            if (on)
+            {
+                auto seam = r.withHeight (black ? 4.6f : 5.2f).reduced (black ? 2.8f : 0.0f, 0.0f);
+                const auto edge = tint (recolour (juce::Colour (0xfff6edff)), keyHue);
+                juce::ColourGradient glow (edge.withAlpha (black ? 1.0f : 0.74f), seam.getTopLeft(),
+                                           edge.withAlpha (0.0f), seam.getBottomLeft(), false);
+                const auto violetEdge = tint (recolour (juce::Colour (0xffa67cfc)), keyHue);
+                glow.addColour (0.36, black ? violetEdge.withAlpha (0.66f) : edge.withAlpha (0.24f));
+                g.setGradientFill (glow);
+                g.fillRect (seam);
+            }
+            else if (! black)
+            {
+                g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.10f), r.getTopLeft(),
+                                                         juce::Colours::transparentWhite, r.getTopLeft().translated (0.0f, 2.2f), false));
+                g.fillRect (r.withHeight (2.2f));
+            }
+
+            if (! black)
+            {
+                g.setColour (juce::Colours::white.withAlpha (lightMode ? 0.06f : 0.22f));
+                g.fillRect (r.withTop (r.getBottom() - 0.85f));
+            }
+        }
+        if (showDetected && pc == targetPc)
+        {
+            g.setColour (lavender.withAlpha (0.35f * state.presence));
+            g.strokePath (p, juce::PathStrokeType (1.3f));
         }
     };
     for (int pc = 0; pc < 12; ++pc) if (! isBlack (pc)) drawKey (pc);

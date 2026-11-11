@@ -4,8 +4,6 @@
 // Visual tokens shared by every component. Change colours here, never inline.
 namespace theme
 {
-// Header wordmark: two-part logotype ("meta" light + "Tune" semibold).
-inline const juce::String wordmarkA { "meta" }, wordmarkB { "Tune" };
 
 // Neutral surface palette. MUTABLE: setTheme() swaps the whole set between the dark and light
 // themes at runtime. Draw surfaces with these tokens (never inline hex) so light mode works.
@@ -30,6 +28,21 @@ inline juce::Colour menuSel { 0xff252528 };   // selected / highlighted menu row
 inline juce::Colour menuTab { 0xff232327 };   // browser tab strip
 inline juce::Colour well { 0xff141416 };      // text fields, slider tracks
 
+// Dark face and material samples from the normalized reference.
+namespace dark
+{
+inline const juce::Colour toolbarTop { 0xff2d2d2d }, toolbarBottom { 0xff232323 };
+inline const juce::Colour toolbarCell { 0xff252525 }, inset { 0xff090909 };
+inline const juce::Colour stage { 0xff0d0d0e }, graphite { 0xff3a393b };
+inline const juce::Colour rail { 0xff121212 }, railCap { 0xff2d2d2e }, railRow { 0xff151515 };
+inline const juce::Colour knobFace { 0xff1d1d1d }, knobEdge { 0xff2c2c2c };
+inline const juce::Colour modeStrip { 0xff262626 }, control { 0xff2c2c2c };
+inline const juce::Colour notePill { 0xff655385 }, noteShade { 0xff544676 };
+inline const juce::Colour scalePanel { 0xff2e2e2e }, utilityPanel { 0xff2a2a2a };
+inline const juce::Colour timingAmber { 0xfffecc8e }, timingTrack { 0xffa68765 };
+inline const juce::Colour heatTrack { 0xff101011 }, labelWhite { 0xff656565 }, labelBlack { 0xff303030 };
+}
+
 inline bool lightMode = false;
 void setTheme (bool light); // swap the neutral palette (keeps the current accent)
 
@@ -49,9 +62,9 @@ inline juce::Colour amber { 0xfff4d09c };
 inline juce::Colour warn { 0xffffb35c };
 
 // Keyboard. Allowed keys glow in the accent colour; forbidden keys are plain grey/black.
-inline juce::Colour keyOnTop { 0xff8a78e2 }, keyOnBottom { 0xffb3a4f8 };
-inline juce::Colour keyOffTop { 0xff8b8b8e }, keyOffBottom { 0xff7c7c80 };   // mutable: lighten in light mode
-inline juce::Colour blackOnTop { 0xff35304a }, blackOnBottom { 0xff5f5192 };
+inline juce::Colour keyOnTop { 0xff9277fb }, keyOnBottom { 0xff897ea8 };
+inline juce::Colour keyOffTop { 0xff646467 }, keyOffBottom { 0xff535355 };   // mutable: lighten in light mode
+inline juce::Colour blackOnTop { 0xff503e8b }, blackOnBottom { 0xff4b445e };
 inline juce::Colour blackOff { 0xff262628 };
 inline juce::Colour labelWhite { 0xff5d5d60 }, labelBlack { 0xff19191a };
 inline juce::Colour greyText { 0xff7d808a };                                // inactive text in the key drawer
@@ -60,8 +73,8 @@ namespace base // immutable originals the accent palette is derived from
 {
 inline constexpr juce::uint32 violet = 0xffa855f7, violetDeep = 0xff7c3aed, pink = 0xffec4899,
     coral = 0xfffb7185, blue = 0xff6aa8ff, cyan = 0xff06b6d4, lavender = 0xffc4b5fd, rose = 0xffb35c87,
-    lilac = 0xffeccdf1, amber = 0xfff4d09c, warn = 0xffffb35c, keyOnTop = 0xff8a78e2,
-    keyOnBottom = 0xffb3a4f8, blackOnTop = 0xff35304a, blackOnBottom = 0xff5f5192;
+    lilac = 0xffeccdf1, amber = 0xfff4d09c, warn = 0xffffb35c, keyOnTop = 0xff9277fb,
+    keyOnBottom = 0xff897ea8, blackOnTop = 0xff503e8b, blackOnBottom = 0xff4b445e;
 }
 
 // Current recolouring, so hard-coded accent colours elsewhere (e.g. the orb) can match.
@@ -101,6 +114,7 @@ inline juce::Colour accentAt (float t)
     return t < 0.5f ? pink.interpolatedWith (violet, t * 2.0f) : violet.interpolatedWith (blue, (t - 0.5f) * 2.0f);
 }
 
+float surfaceNoise (float x, float y) noexcept;
 juce::Font font (float height, bool semibold = false);
 
 // Text with a soft drop shadow. The font must already be set on g; pass the text colour.

@@ -8,10 +8,11 @@ static float pcAngle (float midi) { return juce::MathConstants<float>::twoPi * s
 static juce::Colour coreColourAt (float a)
 {
     static const std::pair<float, juce::Colour> stops[] {
-        { 0.0f, juce::Colour (0xffa86bff) }, { 0.20f, juce::Colour (0xffff6fd8) }, { 0.39f, juce::Colour (0xffffc3dc) },
-        { 0.56f, juce::Colour (0xff9fe9ff) }, { 0.67f, juce::Colour (0xff3fc8ff) }, { 0.83f, juce::Colour (0xff6e7dff) },
-        { 1.0f, juce::Colour (0xffa86bff) } };
-    const float u = std::fmod (a / juce::MathConstants<float>::twoPi + 1.0f, 1.0f);
+        { 0.0f, juce::Colour (0xffffb3de) }, { 0.15f, juce::Colour (0xffffe3e0) },
+        { 0.32f, juce::Colour (0xff67d2f0) }, { 0.48f, juce::Colour (0xff94bfff) },
+        { 0.64f, juce::Colour (0xffb086ff) }, { 0.81f, juce::Colour (0xfff574e7) },
+        { 1.0f, juce::Colour (0xffffb3de) } };
+    const float u = a / juce::MathConstants<float>::twoPi;
     for (size_t i = 1; i < std::size (stops); ++i)
         if (u <= stops[i].first)
             return theme::orbTint (stops[i - 1].second.interpolatedWith (stops[i].second, (u - stops[i - 1].first) / (stops[i].first - stops[i - 1].first)));
@@ -53,30 +54,23 @@ void Orb::setDisplay (const DisplayState& s, bool byp)
     repaint();
 }
 
-juce::Rectangle<float> Orb::padArea() const
-{
-    return getLocalBounds().toFloat().reduced (18.0f * unit());
-}
-
 Orb::GuideGeom Orb::guideGeom() const
 {
-    // Visible L: a vertical line (top -> baseline, with room above for the Dry/Wet label) and a horizontal
-    // line (corner -> right end, with room past it for the Width label), plus a rounded corner radius.
-    const auto pad = padArea();
-    const float U = unit();
-    return { pad.getX(),                              // cornerX
-             pad.getBottom() - 26.0f,                 // baseY (room below for the Width label)
-             pad.getY() + 36.0f + 16.0f * U,          // topY  (top of the vertical line)
-             pad.getRight() - 30.0f - 22.0f * U,      // rightX (end of the horizontal line)
-             18.0f * U };                             // corner radius
+    const auto bounds = getLocalBounds().toFloat();
+    const float u = unit();
+    return { 21.0f * u, bounds.getBottom() - 31.0f * u, 70.0f * u,
+             bounds.getRight() - 113.0f * u, 30.0f * u };
 }
 
 juce::Rectangle<float> Orb::trackArea() const
 {
-    // The handle travels a reduced area so it stops a little before the top of each line.
-    const auto g = guideGeom();
-    const float m = 12.0f * unit();
-    return { g.cornerX, g.topY + m, (g.rightX - m) - g.cornerX, g.baseY - (g.topY + m) };
+    const auto guide = guideGeom();
+    const float inset = 12.0f * unit();
+    const float left = guide.cornerX + guide.radius + 3.1f * inset;
+    const float top = guide.topY + inset;
+    const float right = guide.rightX - inset;
+    const float bottom = guide.baseY - guide.radius - inset;
+    return { left, top, right - left, bottom - top };
 }
 
 juce::Point<float> Orb::handlePos() const
@@ -108,8 +102,8 @@ juce::Path Orb::coreContour (juce::Point<float> c, float radius) const
     for (int i = 0; i <= n; ++i)
     {
         const float th = juce::MathConstants<float>::twoPi * float (i) / float (n);
-        const float r = radius * (1.0f + 0.030f * std::sin (3.0f * th + 0.70f * t)
-                                        + 0.018f * std::sin (5.0f * th - 1.10f * t + 1.0f)
+        const float r = radius * (1.0f + 0.018f * std::sin (3.0f * th + 0.70f * t)
+                                        + 0.013f * std::sin (5.0f * th - 1.10f * t + 1.0f)
                                         + 0.010f * std::sin (9.0f * th + 1.90f * t + 2.3f)
                                         + 0.016f * act * std::sin (11.0f * th + 3.2f * t));
         const juce::Point<float> pt (c.x + r * std::sin (th), c.y - r * std::cos (th));
@@ -131,30 +125,57 @@ void Orb::renderImages()
         juce::Graphics g (sphere);
         g.addTransform (juce::AffineTransform::scale (sc));
         const float Rs = kSphereR * U;
-        juce::ColourGradient body (juce::Colour (0xff0f0e12), c.x, c.y, juce::Colour (0xff302c3a), c.x + Rs, c.y, true);
-        body.addColour (0.55, juce::Colour (0xff17151c));
-        body.addColour (0.85, juce::Colour (0xff24212c));
+        juce::ColourGradient body (juce::Colour (0xff111114), c.x, c.y, juce::Colour (0xff3b3a3e), c.x + Rs, c.y, true);
+        body.addColour (0.55, juce::Colour (0xff161619));
+        body.addColour (0.85, juce::Colour (0xff222224));
         g.setGradientFill (body);
         g.fillEllipse (c.x - Rs, c.y - Rs, 2 * Rs, 2 * Rs);
-        // Lit edge: a feathered band, not a stroke.
+        // The broad smoky rim rolls into a thin, pearly reflection.
         juce::ColourGradient edge (juce::Colours::transparentWhite, c.x, c.y, juce::Colours::transparentWhite, c.x + Rs * 1.06f, c.y, true);
-        edge.addColour (0.82, juce::Colour (0x00c9bfe6));
-        edge.addColour (0.92, juce::Colour (0x26c9bfe6));
-        edge.addColour (0.945, juce::Colour (0x40ddd6f2));
-        edge.addColour (0.985, juce::Colour (0x12c9bfe6));
+        edge.addColour (0.69, juce::Colour (0x00dfdce4));
+        edge.addColour (0.84, juce::Colour (0x19dfdce4));
+        edge.addColour (0.91, juce::Colour (0x61e1dfe7));
+        edge.addColour (0.934, juce::Colour (0xc3eeecf3));
+        edge.addColour (0.942, juce::Colour (0xeefbf7ff));
+        edge.addColour (0.951, juce::Colour (0x30eeecf3));
+        edge.addColour (0.968, juce::Colours::transparentWhite);
         g.setGradientFill (edge);
         g.fillEllipse (c.x - Rs * 1.06f, c.y - Rs * 1.06f, Rs * 2.12f, Rs * 2.12f);
         juce::Random rng (11);
-        for (int i = 0; i < 12000; ++i) // smoke grain, denser toward the edge
+        for (int i = 0; i < 28000; ++i) // smoke grain, denser toward the edge
         {
             const float a = rng.nextFloat() * juce::MathConstants<float>::twoPi;
             const float r = Rs * std::pow (rng.nextFloat(), 0.4f);
-            g.setColour (juce::Colour (0xffd8d0f0).withAlpha (0.012f + 0.045f * std::pow (r / Rs, 3.0f) * rng.nextFloat()));
+            const float cloud = 0.60f + 0.24f * std::sin (11.0f * a + 16.0f * r / Rs) + 0.16f * std::sin (23.0f * a - 6.0f * r / Rs);
+            g.setColour (juce::Colour (0xffe9e5ee).withAlpha (0.009f + 0.23f * cloud * std::pow (r / Rs, 6.0f) * rng.nextFloat()));
             g.fillRect (c.x + r * std::sin (a), c.y - r * std::cos (a), U, U);
         }
+        juce::Image::BitmapData pixels (sphere, juce::Image::BitmapData::readWrite);
+        const auto centrePx = c * sc;
+        const float radiusPx = Rs * sc;
+        const auto rim = juce::Rectangle<float> (2.0f * radiusPx, 2.0f * radiusPx).withCentre (centrePx)
+                             .getSmallestIntegerContainer().getIntersection (sphere.getBounds());
+        for (int y = rim.getY(); y < rim.getBottom(); ++y)
+            for (int x = rim.getX(); x < rim.getRight(); ++x)
+            {
+                const auto offset = (juce::Point<float> (float (x), float (y)) - centrePx) / radiusPx;
+                const float distance = offset.getDistanceFromOrigin();
+                if (distance < 0.73f || distance > 1.025f) continue;
+                const float rimWeight = juce::jlimit (0.0f, 1.0f, (distance - 0.73f) * 4.8f);
+                const float noise = theme::surfaceNoise (float (x) / sc, float (y) / sc);
+                const float angle = std::atan2 (offset.y, offset.x);
+                const float reflection = 0.018f - 0.14f * offset.y - 0.072f * offset.x
+                                         + 0.08f * std::cos (3.0f * angle + 1.1f);
+                const float grain = 0.54f * noise + 0.32f * (rng.nextFloat() - 0.5f);
+                const float crest = (distance - 1.0f) * 71.0f;
+                const float strength = (reflection + grain - 0.06f * std::exp (-crest * crest)) * rimWeight;
+                const auto shade = strength >= 0.0f ? juce::Colour (0xfff5f2fa) : juce::Colours::black;
+                const auto base = pixels.getPixelColour (x, y);
+                pixels.setPixelColour (x, y, base.interpolatedWith (shade.withAlpha (base.getFloatAlpha()), std::abs (strength)));
+            }
     }
 
-    // Haze: a faint particle band hugging the core, drawn rotated each frame.
+    // Cached energy field and particles that move together with the pitch visualisation.
     const float Rh = kHazeR * U;
     const int side = juce::jmax (1, int (Rh * 2.2f * sc));
     core = juce::Image (juce::Image::ARGB, side, side, true);
@@ -162,27 +183,55 @@ void Orb::renderImages()
         juce::Graphics g (core);
         g.addTransform (juce::AffineTransform::scale (sc));
         const juce::Point<float> k (Rh * 1.1f, Rh * 1.1f);
-        const float r0 = kCoreR * U * 0.98f;
+        const float r0 = kCoreR * U * 0.975f;
+        const auto pinkDust = theme::orbTint (juce::Colour (0xffdd7cdb));
+        const auto blueDust = theme::orbTint (juce::Colour (0xff42add8));
+        const auto warmDust = theme::orbTint (juce::Colour (0xffffc2bd));
         juce::Random rng (5);
-        for (int i = 0; i < 44000; ++i)
+        for (int i = 0; i < 20500; ++i)
+        {
+            const float angle = rng.nextFloat() * juce::MathConstants<float>::twoPi;
+            const float radius = r0 * std::sqrt (rng.nextFloat());
+            const auto point = k + juce::Point<float> (std::sin (angle), -std::cos (angle)) * radius;
+            const auto offset = (point - k) / r0;
+            // The warm face catches the light above the curved seam. The cyan underside stays in shadow.
+            const float fold = offset.x - (0.18f + 0.38f * offset.y * offset.y - 0.21f * offset.y);
+            const float seam = std::exp (-std::abs (fold) * 11.0f) * (0.81f - 0.19f * offset.y);
+            const float texture = 0.68f + 0.52f * theme::surfaceNoise (point.x * 2.2f, point.y * 2.2f);
+            const float warmth = juce::jlimit (0.0f, 1.0f, -offset.y * 0.79f + offset.x * 0.33f);
+            const float cool = juce::jlimit (0.0f, 1.0f, 0.43f + offset.x * 0.57f + offset.y * 0.27f);
+            const auto colour = pinkDust.interpolatedWith (blueDust, cool).interpolatedWith (warmDust, warmth);
+            g.setColour (colour.withAlpha ((0.18f + 0.40f * seam + 0.23f * warmth) * texture * rng.nextFloat()));
+            const float size = (0.35f + 0.83f * rng.nextFloat()) * U;
+            g.fillRect (point.x, point.y, size, size);
+        }
+        for (int i = 0; i < 50000; ++i)
         {
             const float a = rng.nextFloat() * juce::MathConstants<float>::twoPi;
-            const float u = std::pow (rng.nextFloat(), 1.9f); // most grains near the contour
-            const float r = r0 + (Rh - r0) * u;
-            const float alpha = (0.05f + 0.46f * (1.0f - u)) * (0.3f + 0.7f * rng.nextFloat());
-            const float sz = (0.40f + rng.nextFloat() * 0.75f) * U;
-            // Brighter, whiter grains hug the contour; the outer veil stays saturated and dim.
-            const float whiteMix = 0.38f + 0.42f * (1.0f - u) * rng.nextFloat();
+            const float u = std::pow (rng.nextFloat(), 2.3f);
+            const float wave = 1.0f + 0.024f * std::sin (3.0f * a + 0.4f)
+                                   + 0.017f * std::sin (7.0f * a) + 0.009f * std::sin (13.0f * a + 1.1f);
+            const float eddy = 0.50f + 0.34f * std::sin (4.0f * a + 0.6f)
+                                    + 0.16f * std::sin (11.0f * a - 0.9f);
+            const float width = 0.35f + 0.65f * eddy;
+            const float scatter = rng.nextBool() ? 1.0f : -0.56f;
+            const float r = r0 * wave + (Rh - r0) * width * u * scatter;
+            const float density = 0.70f + 0.30f * eddy + 0.13f * std::cos (23.0f * a + u * 3.1f);
+            const float alpha = (0.025f + 0.73f * std::pow (1.0f - u, 3.0f))
+                                * (0.26f + 0.74f * rng.nextFloat()) * density;
+            const float sz = (0.34f + rng.nextFloat() * 0.69f) * U;
+            // The rim has a bright filament and coarser, saturated eddies beyond it.
+            const float whiteMix = 0.33f + 0.60f * (1.0f - u) * rng.nextFloat();
             g.setColour (coreColourAt (a).interpolatedWith (juce::Colours::white, whiteMix).withAlpha (alpha));
             g.fillRect (k.x + r * std::sin (a), k.y - r * std::cos (a), sz, sz);
         }
         // A few bright embers scattered just inside the contour for sparkle.
-        for (int i = 0; i < 900; ++i)
+        for (int i = 0; i < 3100; ++i)
         {
             const float a = rng.nextFloat() * juce::MathConstants<float>::twoPi;
             const float r = r0 * (0.72f + 0.26f * rng.nextFloat());
             const float sz = (0.5f + rng.nextFloat() * 1.1f) * U;
-            g.setColour (coreColourAt (a).interpolatedWith (juce::Colours::white, 0.7f).withAlpha (0.10f + 0.45f * rng.nextFloat()));
+            g.setColour (coreColourAt (a).interpolatedWith (juce::Colours::white, 0.7f).withAlpha (0.035f + 0.22f * rng.nextFloat()));
             g.fillEllipse (k.x + r * std::sin (a) - sz * 0.5f, k.y - r * std::cos (a) - sz * 0.5f, sz, sz);
         }
     }
@@ -197,93 +246,31 @@ void Orb::paint (juce::Graphics& g)
     const float a = bypassed ? 0.0f : act;
     const float breath = 0.5f + 0.5f * std::sin (t * 0.55f); // slow atmospheric pulse, 0..1
 
-    // 1. Atmosphere: breathes at rest, swells and clears with the voice.
-    const float grow = 0.90f + 0.025f * breath + 0.11f * a;
-    {
-        g.setOpacity (0.50f + 0.08f * breath + 0.42f * a);
-        g.drawImageTransformed (sphere, juce::AffineTransform::scale (float (getWidth()) / float (sphere.getWidth()),
-                                                                       float (getHeight()) / float (sphere.getHeight()))
-                                            .scaled (grow, grow, c.x, c.y));
-        g.setOpacity (1.0f);
-        // Outer bloom: low and wide.
-        // Outer bloom: a wide nebula haze with a long, soft falloff.
-        const float rb = (kSphereR + 64.0f) * U * grow;
-        juce::ColourGradient bloom (violet.withAlpha (0.0f), c.x, c.y, violet.withAlpha (0.0f), c.x + rb, c.y, true);
-        bloom.addColour (0.50, theme::orbTint (juce::Colour (0xff6f5eb0)).withAlpha (0.04f + 0.02f * breath + 0.08f * a));
-        bloom.addColour (0.72, theme::orbTint (juce::Colour (0xff9a86e8)).withAlpha (0.12f + 0.06f * breath + 0.20f * a));
-        bloom.addColour (0.86, theme::orbTint (juce::Colour (0xffb7a4ff)).withAlpha (0.07f + 0.04f * breath + 0.14f * a));
-        g.setGradientFill (bloom);
-        g.fillEllipse (c.x - rb, c.y - rb, 2 * rb, 2 * rb);
-        // Reflection: a soft arc drifting over the upper edge, like light sliding across glass.
-        const float rr = kSphereR * U * grow * 0.90f;
-        const float mid = -0.55f + 0.35f * std::sin (t * 0.13f);
-        for (int i = 0; i < 3; ++i)
-        {
-            juce::Path arc;
-            const float span = 0.55f - 0.15f * float (i);
-            arc.addCentredArc (c.x, c.y, rr, rr, 0.0f, mid - span, mid + span, true);
-            g.setColour (juce::Colours::white.withAlpha (0.035f + 0.03f * float (i)));
-            g.strokePath (arc, juce::PathStrokeType ((7.0f - 2.0f * float (i)) * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        }
-    }
+    // The rim stays clearly defined as the glass breathes with the voice.
+    const float grow = 0.98f + 0.012f * breath + 0.025f * a;
+    g.setOpacity (bypassed ? 0.52f : 0.9f + 0.1f * a);
+    g.drawImageTransformed (sphere, juce::AffineTransform::scale (float (getWidth()) / float (sphere.getWidth()),
+                                                                   float (getHeight()) / float (sphere.getHeight()))
+                                        .scaled (grow, grow, c.x, c.y));
+    g.setOpacity (1.0f);
 
-    // 2. Orbit: fine ticks with a comet highlight (and its tail) running clockwise.
-    {
-        const float ro = kOrbitR * U * grow;
-        constexpr int ticks = 90;
-        const float comet = t * (0.45f + 0.9f * a);
-        for (int i = 0; i < ticks; ++i)
-        {
-            const float th = juce::MathConstants<float>::twoPi * float (i) / float (ticks) + t * 0.04f;
-            float behind = std::fmod (comet - th, juce::MathConstants<float>::twoPi);
-            if (behind < 0) behind += juce::MathConstants<float>::twoPi;
-            const float tail = std::exp (-behind * 2.6f); // 1 at the head, fading behind it
-            const juce::Point<float> d (std::sin (th), -std::cos (th));
-            g.setColour (lavender.interpolatedWith (cyan, tail * 0.5f).withAlpha (0.07f + 0.08f * a + 0.7f * tail));
-            g.drawLine ({ c + d * (ro - 2.5f * U), c + d * (ro + 2.5f * U) }, (1.1f + 0.8f * tail) * U);
-        }
-    }
+    // A single radial profile keeps the luminous violet crest smooth at every editor scale.
+    const float rm = kFieldR * U * grow;
+    const float pulse = 0.87f + 0.07f * std::sin (t * 1.3f) + 0.09f * a;
+    const auto field = orbTint (juce::Colour (0xff9f7bff));
+    const float fieldExtent = rm + 14.0f * U;
+    juce::ColourGradient profile (field.withAlpha (0.0f), c, field.withAlpha (0.0f),
+                                  c.translated (fieldExtent, 0.0f), true);
+    const std::pair<float, float> falloff[] { { -12.0f, 0.048f }, { -8.0f, 0.20f }, { -4.9f, 0.43f },
+                                             { -2.0f, 0.59f }, { 0.0f, 0.675f }, { 2.0f, 0.60f },
+                                             { 4.9f, 0.43f }, { 8.0f, 0.20f }, { 12.0f, 0.048f } };
+    for (const auto [distance, opacity] : falloff)
+        profile.addColour ((rm + distance * U) / fieldExtent, field.withAlpha (opacity * pulse));
+    g.setGradientFill (profile);
+    g.fillEllipse (juce::Rectangle<float> (2.0f * fieldExtent, 2.0f * fieldExtent).withCentre (c));
 
-    // 3. Field: a bright violet ring with a wide luminous bloom, a crisp core and a glassy highlight.
-    {
-        const float rm = kFieldR * U * (0.97f + 0.03f * grow);
-        const float pulse = 0.5f + 0.5f * std::sin (t * 1.3f + 0.8f);
-        const float lum = 0.75f + 0.25f * pulse + 0.40f * a;
-        const juce::Colour glowCol = theme::orbTint (juce::Colour (0xff8f6bff));
-        // Outer-to-inner halo: widening soft strokes stacked for an additive bloom around the ring.
-        for (int i = 5; i >= 1; --i)
-        {
-            const float w = float (i) * 3.6f * U;
-            g.setColour (glowCol.withAlpha ((0.055f + 0.03f * pulse + 0.10f * a) * (0.3f + 0.7f / float (i)) * lum));
-            g.drawEllipse (c.x - rm, c.y - rm, 2 * rm, 2 * rm, w);
-        }
-        // Crisp ring: a bright gradient core, lit top-left to a deeper violet bottom-right.
-        juce::ColourGradient ring (theme::orbTint (juce::Colour (0xffeadfff)), c.x - rm * 0.7f, c.y - rm * 0.7f,
-                                   theme::orbTint (juce::Colour (0xff6f4fe6)), c.x + rm * 0.7f, c.y + rm * 0.85f, false);
-        ring.addColour (0.5, theme::orbTint (juce::Colour (0xffc3acff)));
-        g.setGradientFill (ring);
-        g.setOpacity (juce::jmin (1.0f, 0.82f + 0.18f * lum));
-        g.drawEllipse (c.x - rm, c.y - rm, 2 * rm, 2 * rm, 2.8f * U);
-        // Thin inner highlight: a glassy sheen on the ring's upper edge.
-        g.setColour (juce::Colours::white.withAlpha (0.28f * lum));
-        const float ri = rm - 1.6f * U;
-        g.drawEllipse (c.x - ri, c.y - ri, 2 * ri, 2 * ri, 0.9f * U);
-        g.setOpacity (1.0f);
-    }
 
-    // 4. Haze: spinning particle band around the core.
-    {
-        const float w = float (core.getWidth()), h = float (core.getHeight());
-        const float sc = kHazeR * U * 2.2f / w; // image pixels -> component units
-        g.setOpacity (0.55f + 0.45f * a);
-        g.drawImageTransformed (core, juce::AffineTransform::translation (-w * 0.5f, -h * 0.5f)
-                                          .scaled (sc * (1.0f + 0.04f * a))
-                                          .rotated (coreAngle + spin)
-                                          .translated (c.x, c.y));
-        g.setOpacity (1.0f);
-    }
-
-    // 5. Core: swirling plum/teal sheen inside an organic, luminous contour.
+    // Swirling plum and teal lighting beneath the particle contour.
     {
         const float rk = kCoreR * U * (1.0f + 0.05f * a);
         const auto contour = coreContour (c, rk);
@@ -293,53 +280,75 @@ void Orb::paint (juce::Graphics& g)
             g.reduceClipRegion (contour);
             g.setColour (juce::Colour (0xff160f20));
             g.fillEllipse (c.x - rk * 1.2f, c.y - rk * 1.2f, rk * 2.4f, rk * 2.4f);
-            const float sw = t * 0.22f + coreAngle; // the sheen swirls and leans toward the sung note
+            const float sw = -1.45f + 0.20f * std::sin (t * 0.40f + coreAngle); // the sheen swirls and leans toward the sung note
             auto blob = [&] (float ang, float dist, float r, juce::Colour col) {
                 const juce::Point<float> at (c.x + rk * dist * std::sin (ang), c.y - rk * dist * std::cos (ang));
                 g.setGradientFill (juce::ColourGradient (col.withMultipliedAlpha (glow), at.x, at.y, col.withAlpha (0.0f), at.x + r, at.y, true));
                 g.fillEllipse (at.x - r, at.y - r, 2 * r, 2 * r);
             };
-            blob (sw, 0.42f, rk * 1.05f, theme::orbTint (juce::Colour (0xb0802a9c)));         // plum
-            blob (sw + 2.3f, 0.48f, rk * 0.95f, theme::orbTint (juce::Colour (0x9a1c8c9c)));  // teal
-            blob (sw + 4.3f, 0.35f, rk * 0.85f, theme::orbTint (juce::Colour (0x8a4436d6)));  // violet
-            blob (sw + 1.2f, 0.55f, rk * 0.62f, theme::orbTint (juce::Colour (0x7aec4899)));  // hot-pink light leak
-            blob (sw + 3.4f, 0.72f, rk * 0.70f, theme::orbTint (juce::Colour (0x886fd0ff)));  // cool blue rim light
-            // Bright nebula heart: a soft white-lavender glow blooming from the centre.
-            g.setGradientFill (juce::ColourGradient (juce::Colour (0xffeae4ff).withMultipliedAlpha (0.42f * glow), c.x, c.y - rk * 0.08f,
-                                                     juce::Colours::transparentWhite, c.x + rk * 0.9f, c.y, true));
-            g.fillEllipse (c.x - rk, c.y - rk, 2 * rk, 2 * rk);
+            blob (sw + 0.16f, 0.57f, rk * 1.24f, orbTint (juce::Colour (0xe8b43ac1)));
+            blob (sw + 4.0f, 0.72f, rk * 1.12f, orbTint (juce::Colour (0xbf267da8)));
+            blob (sw + 2.06f, 0.77f, rk * 0.90f, orbTint (juce::Colour (0xe4ffb5b9)));
+            blob (sw + 3.0f, 0.53f, rk * 0.72f, orbTint (juce::Colour (0x8063c7e4)));
+
+            const float drift = 0.08f * std::sin (0.7f * t + coreAngle);
+            const auto point = [&] (float x, float y) { return c.translated (rk * (x + drift), rk * y); };
+            juce::Path shade;
+            shade.startNewSubPath (point (1.16f, -0.57f));
+            shade.cubicTo (point (1.0f, -0.57f), point (0.54f, -0.28f), point (0.32f, -0.07f));
+            shade.cubicTo (point (0.13f, 0.13f), point (0.24f, 0.59f), point (0.35f, 0.99f));
+            shade.lineTo (point (1.28f, 1.11f));
+            shade.closeSubPath();
+            g.setGradientFill (juce::ColourGradient (orbTint (juce::Colour (0x10132738)), point (0.18f, -0.34f),
+                                                     orbTint (juce::Colour (0xc9081c25)), point (0.83f, 0.46f), false));
+            g.fillPath (shade);
+            blob (sw + 3.35f, 0.75f, rk * 0.55f, orbTint (juce::Colour (0x7606131c)));
             // Glass depth: darker toward the rim, a faint sheen high on one side.
             juce::ColourGradient depth (juce::Colours::transparentBlack, c.x, c.y, juce::Colours::black.withAlpha (0.45f), c.x + rk, c.y, true);
             g.setGradientFill (depth);
             g.fillEllipse (c.x - rk * 1.2f, c.y - rk * 1.2f, rk * 2.4f, rk * 2.4f);
-            g.setColour (juce::Colours::white.withAlpha (0.05f));
-            g.fillEllipse (c.x - rk * 0.55f, c.y - rk * 0.85f, rk * 0.9f, rk * 0.45f);
         }
-        // Contour: three soft glow passes (wide -> tight), then a crisp line shading icy cyan -> white-lavender.
+        // Soft bloom beneath the particles.
         g.setColour (lavender.withAlpha (0.055f * glow));
         g.strokePath (contour, juce::PathStrokeType (16.0f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         g.setColour (lavender.withAlpha (0.10f * glow));
         g.strokePath (contour, juce::PathStrokeType (9.0f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (juce::Colour (0xffd4caff).withAlpha (0.20f * glow));
+        g.setColour (juce::Colour (0xffd4caff).withAlpha (0.12f * glow));
         g.strokePath (contour, juce::PathStrokeType (4.5f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        juce::ColourGradient line (juce::Colour (0xff8fe6ff), c.x - rk, c.y + rk, juce::Colour (0xfff4ecff), c.x + rk, c.y - rk, false);
-        line.addColour (0.75, juce::Colour (0xffffd9f2));
-        g.setGradientFill (line);
-        g.setOpacity (juce::jmin (1.0f, 0.75f + 0.25f * glow));
-        g.strokePath (contour, juce::PathStrokeType (1.8f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    // Cached, uneven particle contour with a slow pitch-responsive turn.
+    {
+        const float w = float (core.getWidth()), h = float (core.getHeight());
+        const float sc = kHazeR * U * 2.2f / w; // image pixels -> component units
+        g.setOpacity (0.72f + 0.28f * a);
+        g.drawImageTransformed (core, juce::AffineTransform::translation (-w * 0.5f, -h * 0.5f)
+                                          .scaled (sc * (1.0f + 0.04f * a))
+                                          .rotated (0.15f * std::sin (spin + coreAngle))
+                                          .translated (c.x, c.y));
         g.setOpacity (1.0f);
     }
 
-    // 6. Symbol: crisp white bolt, shown only while a voice is detected (flickers with the level).
+    // The coloured bolt lights up with the detected voice.
     if (const float ba = boltAmt; ba > 0.0f)
     {
-        const float sc = 0.85f + 0.15f * ba; // small pop as it lights up
-        const auto bp = bolt (juce::Rectangle<float> (19.0f * U * sc, 27.0f * U * sc).withCentre (c));
+        const float sc = 0.89f + 0.11f * ba; // small pop as it lights up
+        juce::Path bp;
+        bp.startNewSubPath (0.57f, 0.0f);
+        bp.lineTo (0.0f, 0.60f);
+        bp.lineTo (0.49f, 0.60f);
+        bp.lineTo (0.44f, 1.0f);
+        bp.lineTo (1.0f, 0.39f);
+        bp.lineTo (0.54f, 0.39f);
+        bp.closeSubPath();
+        bp.applyTransform (juce::AffineTransform::scale (25.0f * U * sc, 41.0f * U * sc)
+                               .translated (c.x - 12.5f * U * sc, c.y - 20.5f * U * sc));
         g.beginTransparencyLayer (ba);
-        // Heavy bloom: a wide violet glow, then a tighter white one, then the crisp symbol on top.
-        juce::DropShadow (violet.withAlpha (0.55f + 0.3f * a), int (18 * U), {}).drawForPath (g, bp);
-        juce::DropShadow (juce::Colours::white.withAlpha (0.45f + 0.2f * a), int (8 * U), {}).drawForPath (g, bp);
-        g.setColour (juce::Colours::white);
+        juce::DropShadow (violet.withAlpha (0.20f), int (6 * U), {}).drawForPath (g, bp);
+        juce::ColourGradient boltLight (orbTint (juce::Colour (0xffef76ed)), c.translated (-8.0f * U, -12.0f * U),
+                                         orbTint (juce::Colour (0xff78a6f9)), c.translated (7.0f * U, 14.0f * U), false);
+        boltLight.addColour (0.55f, orbTint (juce::Colour (0xffb688f4)));
+        g.setGradientFill (boltLight);
         g.fillPath (bp);
         g.endTransparencyLayer();
     }
@@ -350,69 +359,49 @@ void Orb::paint (juce::Graphics& g)
     }
 
 
-    // Doubler guide: a single L with a rounded corner, hidden until the ball or the line is hovered,
-    // then it lights up (white when the line itself is hovered). Each end stops short, by the axis label.
+    // Project the handle onto the two straight sides of the rounded guide.
     const auto hp = handlePos();
     guide.setTarget (dragging || hoverHandle || hoverLine >= 0 ? 1.0f : 0.0f);
-    if (const float ga = guide.get(); ga > 0.004f)
-    {
-        const auto gg = guideGeom();
-        const float U = unit();
-        const float lw = 2.0f * U;
-        const bool hot = hoverLine >= 0;
-        juce::Path L; // vertical down, rounded corner, horizontal right
-        L.startNewSubPath (gg.cornerX, gg.topY);
-        L.lineTo (gg.cornerX, gg.baseY - gg.radius);
-        L.quadraticTo (gg.cornerX, gg.baseY, gg.cornerX + gg.radius, gg.baseY);
-        L.lineTo (gg.rightX, gg.baseY);
-        g.setColour (juce::Colours::white.withAlpha (hot ? 0.95f : 0.55f * ga));
-        g.strokePath (L, juce::PathStrokeType (lw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (juce::Colours::white.withAlpha ((hot ? 0.9f : 0.75f) * ga)); // markers that track the ball
-        g.fillEllipse (gg.cornerX - 3.5f * U, hp.y - 3.5f * U, 7.0f * U, 7.0f * U);
-        g.fillEllipse (hp.x - 3.5f * U, gg.baseY - 3.5f * U, 7.0f * U, 7.0f * U);
-    }
-
-    // XY handle. On hover/drag the ball reads concentric white centre / black / white.
     const float ga = guide.get();
-    const float hr = (15.0f + 1.5f * ga) * U;
-    juce::Path hpath;
-    hpath.addEllipse (hp.x - hr, hp.y - hr, 2 * hr, 2 * hr);
-    juce::DropShadow (juce::Colours::black.withAlpha (0.7f), int (10 * U), { 0, int (3 * U) }).drawForPath (g, hpath);
-    if (ga < 0.999f) // base grey ball, fading out as the hover state ramps in
-    {
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff8f8f94), hp.x, hp.y - hr, juce::Colour (0xff47474b), hp.x, hp.y + hr, false));
-        g.setOpacity (1.0f - ga);
-        g.fillPath (hpath);
-        g.setOpacity (1.0f);
-    }
-    if (ga > 0.001f) // white / black / white rings
-    {
-        const float br = hr - 3.2f * U, wr = hr - 6.4f * U;
-        g.setColour (juce::Colours::white.withAlpha (ga));
-        g.fillEllipse (hp.x - hr, hp.y - hr, 2 * hr, 2 * hr);
-        g.setColour (juce::Colours::black.withAlpha (ga));
-        g.fillEllipse (hp.x - br, hp.y - br, 2 * br, 2 * br);
-        g.setColour (juce::Colours::white.withAlpha (ga));
-        g.fillEllipse (hp.x - wr, hp.y - wr, 2 * wr, 2 * wr);
-    }
-    else
-    {
-        g.setColour (juce::Colours::white.withAlpha (0.12f));
-        g.strokePath (hpath, juce::PathStrokeType (1.0f));
-    }
-
-    // Doubler axis labels, drawn on top of the ball so it passes behind the text instead of over it.
-    if (const float ga = guide; ga > 0.0f)
+    if (ga > 0.004f)
     {
         const auto gg = guideGeom();
-        const float U = unit();
-        g.setFont (font (12.0f, true));
-        // Brighter text with a strong shadow so it stays legible when the grey ball slides behind it.
-        shadowFittedText (g, yName, juce::Rectangle<float> (juce::jmax (2.0f, gg.cornerX - 10.0f), gg.topY - 46.0f, 110.0f, 30.0f),
-                          juce::Justification::centredLeft, 2, text.withAlpha (ga), 1.0f);
-        // "Doubler Width" sits past the end of the horizontal line, centred on it, with a clear gap.
-        shadowFittedText (g, xName, juce::Rectangle<float> (gg.rightX + 20.0f * U, gg.baseY - 17.0f, 84.0f, 34.0f), juce::Justification::centredLeft, 2, text.withAlpha (ga), 1.0f);
+        juce::Path axes;
+        axes.startNewSubPath (gg.cornerX, gg.topY);
+        axes.lineTo (gg.cornerX, gg.baseY - gg.radius);
+        axes.quadraticTo (gg.cornerX, gg.baseY, gg.cornerX + gg.radius, gg.baseY);
+        axes.lineTo (gg.rightX, gg.baseY);
+
+        const auto guideColour = lightMode ? text : juce::Colour (0xffc6c7c9);
+        g.setColour (guideColour.withAlpha ((hoverLine >= 0 ? 0.72f : 0.53f) * ga));
+        g.strokePath (axes, juce::PathStrokeType (1.8f * U, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        const float dot = 6.0f * U;
+        g.setColour (guideColour.withAlpha (0.76f * ga));
+        g.fillEllipse (juce::Rectangle<float> (dot, dot).withCentre ({ gg.cornerX, hp.y }));
+        g.fillEllipse (juce::Rectangle<float> (dot, dot).withCentre ({ hp.x, gg.baseY }));
+
+        g.setFont (font (12.0f * U, true));
+        const auto labelColour = text.withAlpha (0.66f * ga);
+        shadowFittedText (g, yName, juce::Rectangle<float> (56.0f * U, 31.0f * U).withCentre ({ gg.cornerX + 9.0f * U, gg.topY - 29.0f * U }),
+                          juce::Justification::centred, 2, labelColour);
+        shadowFittedText (g, xName, juce::Rectangle<float> (65.0f * U, 32.0f * U).withCentre ({ gg.rightX + 49.0f * U, gg.baseY }),
+                          juce::Justification::centred, 2, labelColour);
     }
+
+    // Keep the handle subdued while the guides are visible.
+    const float hr = 14.7f * U;
+    const auto handle = juce::Rectangle<float> (2.0f * hr, 2.0f * hr).withCentre (hp);
+    juce::Path silhouette;
+    silhouette.addEllipse (handle);
+    juce::DropShadow (juce::Colours::black.withAlpha (0.58f), juce::roundToInt (4.0f * U),
+                      { 0, juce::roundToInt (2.0f * U) }).drawForPath (g, silhouette);
+    const auto top = juce::Colour (0xff575857).interpolatedWith (juce::Colour (0xff343435), ga);
+    const auto bottom = juce::Colour (0xff5a5a5a).interpolatedWith (juce::Colour (0xff171719), ga);
+    g.setGradientFill (juce::ColourGradient (top, hp.x, handle.getY(), bottom, hp.x, handle.getBottom(), false));
+    g.fillEllipse (handle);
+    g.setColour (juce::Colours::white.withAlpha (0.37f - 0.16f * ga));
+    g.drawEllipse (handle, 1.2f * U);
+
 
     if (dragging)
     {

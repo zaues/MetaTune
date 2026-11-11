@@ -28,8 +28,6 @@ public:
     double proportionOfLengthToValue (double p) override { return toValue ? toValue (p) : Slider::proportionOfLengthToValue (p); }
     double valueToProportionOfLength (double v) override { return toProportion ? toProportion (v) : Slider::valueToProportionOfLength (v); }
 
-    // A neighbouring knob nests into this one: its disc (plus a gap) is cut out of this knob.
-    void setCutout (juce::Point<float> centreInParent, float radius) { cutCentre = centreInParent; cutRadius = radius; repaint(); }
     // 0..1 voice activity: the aggressive band glows brighter while someone is singing.
     void setActivity (float a) { if (std::abs (a - activity) > 0.01f) { activity = a; repaint(); } }
 
@@ -54,7 +52,5 @@ private:
     theme::Anim hover { *this };
     theme::Anim turning { *this, 0.3f }; // readout tint while the knob is being turned
     float activity = 0;
-    juce::Point<float> cutCentre;
-    float cutRadius = 0;
     std::unique_ptr<juce::TextEditor> editor;
 };

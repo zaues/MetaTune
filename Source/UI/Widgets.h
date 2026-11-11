@@ -33,9 +33,11 @@ class IconButton : public juce::Button
 public:
     IconButton (const juce::String& name, juce::Path icon, juce::String caption = {}, juce::Path icon2 = {});
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
-    juce::Colour onColour = theme::text;
-    float iconScale = 0.62f;
+    juce::Colour onColour = theme::text, idleColour;
+    juce::Point<float> iconOffset;
+    float iconScale = 0.62f, captionInset = -1.0f;
     bool hoverFill = true;
+    bool useFilledIcons = false;
     void buttonStateChanged() override { hover.setTarget (isOver() || isDown() ? 1.0f : 0.0f); }
 
 private:
@@ -60,14 +62,14 @@ private:
 class TextPill : public juce::Button
 {
 public:
-    enum class Kind { Primary, Plain };
+    enum class Kind { Primary, Plain, SplitLeft, SplitRight };
     TextPill (const juce::String& text, Kind k) : juce::Button (text), kind (k) { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     void buttonStateChanged() override { hover.setTarget (isOver() ? 1.0f : 0.0f); }
 
 private:
     Kind kind;
-    theme::Anim hover { *this }, lit { *this, 0.25f };
+    theme::Anim hover { *this };
 };
 
 // "Update available" pill in the header: signature gradient, a soft pulse until hovered once.
@@ -91,13 +93,14 @@ private:
 class ToggleSwitch : public juce::Button
 {
 public:
+    void setWarmAccent (bool warm) { if (warmAccent != warm) { warmAccent = warm; repaint(); } }
     ToggleSwitch() : juce::Button ("switch") { setClickingTogglesState (true); setMouseCursor (juce::MouseCursor::PointingHandCursor); }
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     void buttonStateChanged() override { hover.setTarget (isOver() ? 1.0f : 0.0f); }
 
 private:
     theme::Anim hover { *this }, pos { *this, 0.25f };
-    bool first = true;
+    bool first = true, warmAccent = false;
 };
 
 // Row of amber segments bound to a choice parameter (Note Stabilizer). Each segment maps to one choice index.
@@ -105,6 +108,8 @@ class SegmentedControl : public juce::Component, public juce::SettableTooltipCli
 {
 public:
     SegmentedControl (juce::RangedAudioParameter&, juce::StringArray labels, juce::UndoManager*);
+    void setWarmAccent (bool warm) { if (warmAccent != warm) { warmAccent = warm; repaint(); } }
+    bool usesWarmAccent() const noexcept { return warmAccent; }
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseMove (const juce::MouseEvent&) override;
@@ -119,6 +124,7 @@ private:
     juce::StringArray labels;
     juce::ParameterAttachment attach;
     int selected = 0, hover = -1;
+    bool warmAccent = false;
     theme::Anim slide { *this, 0.25f };              // highlight position, in segments
     std::array<std::unique_ptr<theme::Anim>, 8> hoverAmt;
 };
@@ -138,8 +144,9 @@ public:
     void mouseExit (const juce::MouseEvent&) override { if (hover >= 0) hoverAmt[hover].setTarget (0.0f); hover = -1; }
 
 private:
-    static constexpr int kTop = 68; // grid icon cell height
-    int indexAt (float y) const;
+    static constexpr int kTop = 60, arrowRailHeight = 35;
+    float rowHeight() const;
+    int indexAt (juce::Point<float>) const;
     theme::Anim hoverAmt[4] { theme::Anim { *this }, theme::Anim { *this }, theme::Anim { *this }, theme::Anim { *this } };
     theme::Anim selAmt[4] { theme::Anim { *this }, theme::Anim { *this }, theme::Anim { *this }, theme::Anim { *this } };
     int selected = -1, hover = -1;

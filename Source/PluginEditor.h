@@ -7,12 +7,14 @@
 #include "UI/Widgets.h"
 #include "Update/Update.h"
 
-// Fixed 1082x856 design canvas; the editor scales it uniformly (60-150 %) so the layout is designed
+// Fixed 1082x807 design canvas; the editor scales it uniformly (60-150 %) so the layout is designed
 // once, never squeezed. All visual data comes from the processor's telemetry queue.
 class MetaTuneEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
-    static constexpr int kW = 1082, kH = 856;
+    static constexpr int referenceW = 1415, referenceH = 1056;
+    static constexpr int kW = 1082, kH = 807; // Logical JUCE units, fitted to the reference aspect ratio.
+    static int heightForWidth (float width) { return juce::roundToInt (width * referenceH / referenceW); }
 
     explicit MetaTuneEditor (MetaTuneProcessor&);
     ~MetaTuneEditor() override;
@@ -20,6 +22,7 @@ public:
     void paint (juce::Graphics& g) override { g.fillAll (theme::bg1); }
 
 private:
+    friend struct MetaTuneSnapshotAccess;
     struct Canvas : public juce::Component
     {
         explicit Canvas (MetaTuneEditor& e) : owner (e) {}
@@ -86,21 +89,20 @@ private:
     AutoKeyCard autoKeyCard;
 
     TextPill notePill { "Note", TextPill::Kind::Primary };
-    TextPill majorPill { "Major", TextPill::Kind::Plain }, minorPill { "Minor", TextPill::Kind::Plain };
-    TextPill chromaticPill { "Chromatic", TextPill::Kind::Plain }, scalePill { "Scale", TextPill::Kind::Plain };
+    TextPill majorPill { "Major", TextPill::Kind::SplitLeft }, minorPill { "Minor", TextPill::Kind::SplitLeft };
+    TextPill majorHoldPill { "Hold", TextPill::Kind::SplitRight }, minorHoldPill { "Hold", TextPill::Kind::SplitRight };
     ToggleSwitch lowLatency;
 
     IconButton colorButton { "color", icons::palette() };
     IconButton menuButton { "menu", icons::menu() };
     IconButton saveButton { "save", icons::save() };
-    IconButton undoButton { "undo", icons::undo() }, redoButton { "redo", icons::redo() }, resetButton { "reset", icons::loop() };
+    IconButton undoButton { "undo", icons::undo() }, redoButton { "redo", icons::redo() };
     PillButton aButton { "A" }, bButton { "B" };
     IconButton copyButton { "copy", icons::copyArrow() };
     IconButton helpButton { "tips", icons::chat() };
-    IconButton heatButton { "heat", icons::eye(), "No Pitch\nReference", icons::swap() };
+    IconButton heatButton { "heat", icons::eye(), "In/Out\nHeatMaps", icons::swap() };
     IconButton detectedButton { "detected", icons::eye(), "Detected\nNotes", icons::swap() };
     IconButton bypassButton { "bypass", icons::power(), "Global\nBypass" };
-    IconButton autoKeyButton { "autokey", icons::key(), "Auto\nKey" };
     IconButton chromaticButton { "chromatic", icons::swap(), "Chromatic" };
     UpdatePill updatePill;
     update::Checker updateChecker;
@@ -120,7 +122,7 @@ private:
     float latestRms = 0;
     int shownRange = -1;
     int presetCheckTicks = 0; // throttles the "current preset still exists on disk?" check
-    juce::Image brushed; // brushed-metal texture for the knob panel, rendered once
+    juce::Image brushed, titleTexture; // Cached chrome textures.
     double openedMs = juce::Time::getMillisecondCounterHiRes();
     float openScale = proc.ui.scale; // saved size at open; the host's first resize must not replace it
     bool sizeRestored = false;

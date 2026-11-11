@@ -6,6 +6,10 @@
 struct ReleaseNote { const char* version; const char* body; };
 
 inline const ReleaseNote kReleaseNotes[] = {
+    { "0.6.1",
+      "- Refined the live orb, knob readouts, and piano key lighting.\n"
+      "- Input and output heatmaps show finer streaks with brighter pitch peaks.\n"
+      "- Updated the toolbar, group navigation, and control strip." },
     { "0.6.0",
       "- New: Auto Key, under Global Bypass. Open MetaKey on your beat's mixer track, then click Auto Key here and Apply to set MetaTune's key in one click.\n"
       "- If MetaKey isn't installed, Auto Key offers to install it for you.\n"
