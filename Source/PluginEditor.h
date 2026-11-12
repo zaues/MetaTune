@@ -31,6 +31,7 @@ private:
     };
 
     void timerCallback() override;
+    void updateFrame (double now, float elapsedSeconds);
     void updateBypassAppearance (bool bypassed, double now);
     void mouseDown (const juce::MouseEvent&) override; // global listener: a click outside the key picker closes it
     void layout();
@@ -128,6 +129,7 @@ private:
 
     DisplayState display;
     double lastVoicedMs = -1e9;
+    double lastFrameMs = -1.0;
     float latestRms = 0;
     float latestSustainRatio = 1.0f;
     int shownRange = -1;

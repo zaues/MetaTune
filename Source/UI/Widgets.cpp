@@ -575,13 +575,14 @@ void RootPicker::setState (int r, int s, bool f)
 juce::Rectangle<float> RootPicker::tabRect (int i) const
 {
     const float w = float (getWidth()) * 0.5f;
-    return { w * float (i), 0.0f, w, 24.0f };
+    return { w * float (i), 0.0f, w, float (getHeight()) * 0.10f };
 }
 
 juce::Rectangle<float> RootPicker::noteRect (int pc) const
 {
-    const float w = float (getWidth()) / 3.0f, h = 30.0f;
-    return { w * float (pc % 3), 24.0f + h * float (pc / 3), w, h };
+    const float w = float (getWidth()) / 3.0f;
+    const float tabs = tabRect (0).getBottom(), h = (float (getHeight()) - tabs) * 0.125f;
+    return { w * float (pc % 3), tabs + h * float (pc / 3), w, h };
 }
 
 juce::Rectangle<float> RootPicker::scaleRect (int i) const
@@ -602,67 +603,109 @@ void RootPicker::paint (juce::Graphics& g)
     const auto mouse = getMouseXYRelative().toFloat();
     const bool over = isMouseOver (true);
 
-    g.setColour (bg3);
-    g.fillRect (b);
-    g.setColour (bg0);
-    g.fillRect (b.withLeft (b.getRight() - 1.0f));
+    const auto activeInk = lightMode ? text : juce::Colour (0xffeae8e6);
+    const auto inactiveInk = lightMode ? textDim : juce::Colour (0xff868686);
+    if (lightMode)
+    {
+        g.setColour (bg3);
+        g.fillRect (b);
+    }
+    else
+    {
+        const auto rootBounds = b.withTop (tabRect (0).getBottom()).withBottom (noteRect (11).getBottom());
+        const auto scaleBounds = b.withTop (rootBounds.getBottom());
+        const auto fill = [&] (juce::Rectangle<float> area, juce::uint32 left, juce::uint32 right)
+        {
+            g.setGradientFill (juce::ColourGradient (juce::Colour (left), area.getTopLeft(),
+                                                     juce::Colour (right), area.getTopRight(), false));
+            g.fillRect (area);
+        };
+        fill (b.withBottom (rootBounds.getY()), 0xff2f2f2f, 0xff202020);
+        fill (rootBounds, 0xff393939, 0xff272727);
+        fill (scaleBounds, 0xff373737, 0xff212121);
+    }
+    g.setColour (lightMode ? bg0 : juce::Colour (0xff151515));
+    g.fillRect (b.withTrimmedLeft (b.getWidth() - 1.0f));
+    g.setColour (activeInk.withAlpha (0.08f));
+    g.fillRect (b.withY (tabRect (0).getBottom() - 1.0f).withHeight (1.0f));
 
     int cell = 0;
-    auto hoverBox = [&] (juce::Rectangle<float> r, bool selected) {
-        auto& a = cellAnim (cell++);
-        a.setTarget (over && r.contains (mouse) ? 1.0f : 0.0f);
-        const auto rr = r.reduced (2.0f, 1.5f);
-        // Active item: thin light-grey box (no fill). Hover: a fainter box fading in.
-        const float k = juce::jmax (selected ? 1.0f : 0.0f, 0.6f * a.get());
-        if (k > 0.0f)
+    const auto hoverAt = [&] (juce::Rectangle<float> r)
+    {
+        auto& animation = cellAnim (cell++);
+        animation.setTarget (over && r.contains (mouse) ? 1.0f : 0.0f);
+        return animation.get();
+    };
+    const auto highlight = [&] (juce::Rectangle<float> r, bool selected, float hover)
+    {
+        if (selected || hover > 0.0f)
         {
-            g.setColour (juce::Colour (0xffc9ccd4).withAlpha (0.85f * k));
-            g.drawRect (rr, 1.0f);
+            g.setColour (activeInk.withAlpha (0.033f * float (selected) + 0.035f * hover));
+            g.fillRect (r);
+        }
+        if (hover > 0.0f)
+        {
+            g.setColour (activeInk.withAlpha (0.60f * hover));
+            g.drawRect (r.reduced (1.0f, 0.75f), 1.0f);
         }
     };
 
-    // Flats / Sharps tabs.
     for (int i = 0; i < 2; ++i)
     {
         const auto r = tabRect (i);
-        const bool sel = (i == 0) == flats;
-        auto& a = cellAnim (cell++);
-        a.setTarget (over && r.contains (mouse) ? 1.0f : 0.0f);
-        if (sel || a.get() > 0.0f)
+        const bool selected = (i == 0) == flats;
+        const float hover = hoverAt (r);
+        if (selected || hover > 0.0f)
         {
-            g.setColour (text.withAlpha (sel ? 0.14f : 0.09f * a.get()));
+            const auto fill = lightMode ? text.withAlpha (0.12f) : juce::Colour (0xff3a3a3a);
+            g.setColour (fill.withMultipliedAlpha (selected ? 1.0f : 0.65f * hover));
             juce::Path tab;
-            tab.addRoundedRectangle (r.getX(), r.getY() + 1.0f, r.getWidth(), r.getHeight() - 1.0f,
-                                     8.0f, 8.0f, true, true, false, false);
+            tab.addRoundedRectangle (r.getX() + 0.5f, r.getY() + 1.0f, r.getWidth() - 1.0f, r.getHeight() - 1.0f,
+                                     6.0f, 6.0f, true, true, false, false);
             g.fillPath (tab);
         }
-        g.setFont (font (15.0f, sel));
-        shadowText (g, i == 0 ? juce::String ("Flats") : juce::String ("Sharps"), r, juce::Justification::centred, sel ? text : greyText.interpolatedWith (text, a.get()));
+        g.setFont (font (15.0f, selected));
+        shadowText (g, i == 0 ? juce::String ("Flats") : juce::String ("Sharps"), r,
+                    juce::Justification::centred, inactiveInk.interpolatedWith (activeInk, selected ? 1.0f : hover));
     }
 
-    // Root grid: letter plus a raised accidental.
+    // The small accidental sits high beside the letter.
+    const auto noteFont = font (20.0f, true);
+    const auto accidentalFont = font (12.0f, true);
+    const juce::String symbol (flats ? "b" : "#");
+    const float symbolWidth = juce::GlyphArrangement::getStringWidth (accidentalFont, symbol);
     for (int pc = 0; pc < 12; ++pc)
     {
         const auto r = noteRect (pc);
-        hoverBox (r, pc == root);
-        juce::AttributedString as;
-        const auto col = pc == root ? text : greyText;
-        as.append (flats ? flatLetters[pc] : letters[pc], font (22.0f, true), col);
+        const bool selected = pc == root;
+        const float hover = hoverAt (r);
+        highlight (r, selected, hover);
+
+        const juce::String letter (flats ? flatLetters[pc] : letters[pc]);
+        const auto ink = inactiveInk.interpolatedWith (activeInk, selected ? 1.0f : 0.82f * hover);
+        const float letterWidth = juce::GlyphArrangement::getStringWidth (noteFont, letter);
+        const float x = r.getCentreX() - (letterWidth + (accidental[pc] ? symbolWidth : 0.0f)) * 0.5f;
+        g.setColour (ink);
+        g.setFont (noteFont);
+        g.drawText (letter, r.withX (x).withWidth (letterWidth + 1.0f), juce::Justification::centredLeft, false);
         if (accidental[pc])
-            as.append (flats ? "b" : "#", font (13.0f, true), col);
-        juce::TextLayout tl;
-        tl.createLayout (as, r.getWidth());
-        tl.draw (g, juce::Rectangle<float> (tl.getWidth(), tl.getHeight()).withCentre (r.getCentre()));
+        {
+            g.setFont (accidentalFont);
+            g.drawText (symbol, r.withX (x + letterWidth).withWidth (symbolWidth + 1.0f).translated (0.0f, -3.0f),
+                        juce::Justification::centredLeft, false);
+        }
     }
 
     // Chromatic has its own button below the drawer.
     for (int i = 0; i < scaleNames().size() - 1; ++i)
     {
         const auto r = scaleRect (i);
-        hoverBox (r, false);
-        const bool sel = i == scale;
-        g.setFont (font (14.0f, sel));
-        shadowText (g, scaleNames()[i], r, juce::Justification::centred, sel ? text : greyText);
+        const bool selected = i == scale;
+        const float hover = hoverAt (r);
+        highlight (r, selected, hover);
+        g.setFont (font (14.0f, selected));
+        shadowText (g, scaleNames()[i], r, juce::Justification::centred,
+                    inactiveInk.interpolatedWith (activeInk, selected ? 1.0f : 0.82f * hover));
     }
 }
 

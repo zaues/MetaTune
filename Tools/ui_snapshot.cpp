@@ -1,7 +1,7 @@
 // Renders the real editor to PNG for visual review (runs under Wine; no host needed).
 // Feeds the processor a synthetic, slightly sharp harmonic tone so the visualisers show real DSP data.
 // usage: ui_snapshot.exe <out-dir> [scale] [mode]
-// Modes: major, bypass, silent, light, reference, reference-next, alternate, custom,
+// Modes: major, bypass, silent, light, reference, reference-next, orb-motion, alternate, custom,
 //        notes, doubler, speed-positive, speed-zero, speed-negative, bypass-video,
 //        doubler-min, doubler-mid, doubler-max, doubler-idle, audition-major, audition-minor, presets, groups, sustain, controls.
 #include "../Source/PluginProcessor.h"
@@ -22,7 +22,38 @@ struct MetaTuneSnapshotAccess
     }
 
     static void holdRequestedSize (MetaTuneEditor& editor) { editor.sizeRestored = true; }
-    static void frame (MetaTuneEditor& editor) { editor.timerCallback(); }
+    static void frame (MetaTuneEditor& editor)
+    {
+        editor.updateFrame (juce::Time::getMillisecondCounterHiRes(), 1.0f / 60.0f);
+    }
+
+    static bool renderOrbMotion (MetaTuneEditor& editor, const juce::File& directory)
+    {
+        auto& orb = editor.orb;
+        const auto area = juce::Rectangle<float> (365.0f, 365.0f).withCentre (orb.centre()).getSmallestIntegerContainer();
+        auto display = editor.display;
+        std::array<double, 24> renderTimes {};
+        for (int i = 0; i < int (renderTimes.size()); ++i)
+        {
+            const float phrase = float (i) / 24.0f;
+            display.outputMidi += 0.065f;
+            display.level = 0.73f + 0.18f * std::sin (phrase * juce::MathConstants<float>::twoPi);
+            orb.setDisplay (display, -3.0f, 0.0f, 1.0f / 60.0f);
+            const auto start = juce::Time::getMillisecondCounterHiRes();
+            const auto image = orb.createComponentSnapshot (area);
+            renderTimes[size_t (i)] = juce::Time::getMillisecondCounterHiRes() - start;
+            const auto name = "orb-frame-" + juce::String (i).paddedLeft ('0', 2) + ".png";
+            const auto file = directory.getChildFile (name);
+            file.deleteFile();
+            juce::FileOutputStream stream (file);
+            if (! stream.openedOk() || ! juce::PNGImageFormat().writeImageToStream (image, stream))
+                return false;
+        }
+        std::sort (renderTimes.begin(), renderTimes.end());
+        std::printf ("Orb crop render median %.2f ms, maximum %.2f ms (%d frames)\n",
+                     renderTimes[renderTimes.size() / 2], renderTimes.back(), int (renderTimes.size()));
+        return true;
+    }
     static void useReferencePalette (MetaTuneEditor& editor, bool light)
     {
         theme::setTheme (light);
@@ -400,7 +431,8 @@ int main (int argc, char** argv)
     const bool sustainReference = mode == "sustain";
     const bool browserReference = mode == "presets" || mode == "groups";
     const bool chordAudition = mode == "audition-major" || mode == "audition-minor";
-    const bool fixedFrame = mode == "reference" || tailBlocks > 0 || alternate || custom
+    const bool orbMotion = mode == "orb-motion";
+    const bool fixedFrame = mode == "reference" || orbMotion || tailBlocks > 0 || alternate || custom
                             || speedReference || doublerReference || videoBypass || chordAudition
                             || sustainReference || browserReference;
     if (fixedFrame)
@@ -554,6 +586,9 @@ int main (int argc, char** argv)
             picker->toFront (false);
         }
     }
+
+    if (orbMotion && ! MetaTuneSnapshotAccess::renderOrbMotion (editor, outDir))
+        return 1;
 
     const auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
     const auto file = outDir.getChildFile ("ui_" + juce::String (juce::roundToInt (scale * 100)) + mode + ".png");

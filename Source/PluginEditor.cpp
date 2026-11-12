@@ -858,8 +858,15 @@ void MetaTuneEditor::updateBypassAppearance (bool bypassed, double now)
 
 void MetaTuneEditor::timerCallback()
 {
-    // Drain DSP telemetry: every sample feeds the HeatMaps, the newest drives the live displays.
     const double now = juce::Time::getMillisecondCounterHiRes();
+    const float elapsed = lastFrameMs < 0.0 ? 1.0f / 60.0f : float ((now - lastFrameMs) * 0.001);
+    lastFrameMs = now;
+    updateFrame (now, elapsed);
+}
+
+void MetaTuneEditor::updateFrame (double now, float elapsedSeconds)
+{
+    // Drain DSP telemetry: every sample feeds the HeatMaps, the newest drives the live displays.
 
     // Once, shortly after opening: if the host resized us away from the saved size, put it back.
     if (! sizeRestored && now - openedMs > 250.0)
@@ -902,7 +909,7 @@ void MetaTuneEditor::timerCallback()
     display.level += (lvl - display.level) * 0.25f;
 
     updateBypassAppearance (bypassed, now);
-    orb.setDisplay (display, state.getRawParameterValue (ParamID::speed)->load(), bypassBlend);
+    orb.setDisplay (display, state.getRawParameterValue (ParamID::speed)->load(), bypassBlend, elapsedSeconds);
     speedKnob.setActivity (display.presence * (0.35f + 0.65f * display.level));
     const float sustain = state.getRawParameterValue (ParamID::sustain)->load() * 0.01f;
     speedKnob.setSustainDisplay (sustain, display.voiced && display.target >= 0 ? latestSustainRatio : 1.0f);
