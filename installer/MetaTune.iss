@@ -6,7 +6,7 @@
 
 #define AppName "MetaTune"
 #ifndef AppVersion
-  #define AppVersion "0.6.2"
+  #define AppVersion "0.6.3"
 #endif
 #define Bundle "MetaTune.vst3"
 #define BuiltBundle "..\build\msvc-Release\MetaTune_artefacts\Release\VST3\" + Bundle

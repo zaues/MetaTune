@@ -598,7 +598,6 @@ void Orb::paint (juce::Graphics& g)
             .interpolatedWith (juce::Colour (warm), bypassAmount);
     };
 
-    // A quiet phrase leaves a thin outline. The smoky shell returns with the voice.
     const float grow = 0.98f + 0.012f * breath + 0.025f * a;
     const float sphereRadius = kSphereR * U * grow;
     const float voiceHue = ease (0.48f + 0.66f * std::sin (float (2.7 * t) + 2.0f * coreAngle));
@@ -606,21 +605,16 @@ void Orb::paint (juce::Graphics& g)
     const float sustainedColour = (1.0f - splitAmount) * 0.89f * ease ((voicedSeconds - 0.75f) / 1.15f);
     const float violetShell = haloEnvelope * juce::jmax (sustainedColour * (0.78f + 0.22f * voiceHue),
                                                          stereo * voiceHue);
-    const float idlePearl = (0.10f + 0.17f * breath) * (1.0f - stereo);
-    const float pearl = juce::jmax (idlePearl, haloEnvelope) * (1.0f - 0.80f * violetShell)
-                      * (1.0f - 0.67f * bypassAmount);
+    // Keep the white shell lit through pauses. Activity only drives the tint above it.
+    const float pearl = 1.0f - 0.67f * bypassAmount;
     const float shellSide = sphereRadius * 2.12f;
     const auto shellTransform = juce::AffineTransform::translation (-0.5f * sphere.getWidth(), -0.5f * sphere.getHeight())
         .scaled (shellSide / float (sphere.getWidth())).rotated (haloPhase).translated (c.x, c.y);
-    if (pearl > 0.004f)
-    {
-        g.setOpacity (pearl);
-        g.drawImageTransformed (sphere, shellTransform);
-        g.setOpacity (1.0f);
-    }
+    g.setOpacity (pearl);
+    g.drawImageTransformed (sphere, shellTransform);
 
     // Apply the bypass and Doubler tint through the same atmosphere texture.
-    const float normalWash = 0.37f * (1.0f - haloEnvelope) + 0.73f * violetShell;
+    const float normalWash = 0.73f * violetShell;
     const float wash = std::lerp (normalWash, 0.43f + 0.43f * haloEnvelope, bypassAmount);
     const auto tint = juce::Colour (0xffd5d0dd).interpolatedWith (orbTint (juce::Colour (0xff9472ed)), violetShell)
         .interpolatedWith (bypassAccent, bypassAmount);
